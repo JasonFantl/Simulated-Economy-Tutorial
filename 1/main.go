@@ -38,7 +38,8 @@ func (g *Game) Update() error {
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
-	economy.GraphExpectedValues(screen, 100, 500, 1.0, 20.0)
+	economy.GraphExpectedValues(screen, 100, 450, 1.0, 20.0)
+	economy.GraphSupplyDemand(screen, 400, 750, 10.0, 1.0)
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
@@ -49,7 +50,7 @@ func main() {
 	rand.Seed(time.Now().Unix())
 	game := &Game{}
 
-	ebiten.SetWindowSize(840, 640)
+	ebiten.SetWindowSize(1040, 840)
 	ebiten.SetWindowTitle("Economy Simulation")
 
 	economy.Initialize(200)

@@ -72,13 +72,7 @@ func Update() {
 	}
 
 	// update graph
-	for actor := range actors {
-		if _, ok := previousDataPoints[actor]; !ok {
-			previousDataPoints[actor] = make([]dataPoint, 0)
-		}
-
-		previousDataPoints[actor] = append(previousDataPoints[actor], dataPoint{actor.expectedMarketValue, actor.personalValue, actor.expectedMarketValue < actor.personalValue})
-	}
+	updateGraph()
 }
 
 func Influence(value float64) {
