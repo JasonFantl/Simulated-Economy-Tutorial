@@ -16,7 +16,7 @@ func NewActor() *Actor {
 		markets: map[Good]*Market{
 			WOOD:    NewMarket(4 + rand.Float64()*4),
 			CHAIR:   NewMarket(20 + rand.Float64()*10),
-			LEISURE: NewMarket(10),
+			LEISURE: NewMarket(8 + rand.Float64()*4),
 		},
 	}
 	return actor
@@ -44,15 +44,14 @@ func (actor *Actor) update() {
 	materialCount := 4
 	if actor.markets[WOOD].ownedGoods > materialCount {
 		potentialChairValue := math.Max(actor.potentialPersonalValue(CHAIR), actor.markets[CHAIR].expectedMarketValue)
-		// potentialChairValue = actor.potentialPersonalValue(CHAIR)
 		materialValue := math.Max(actor.currentPersonalValue(WOOD), actor.markets[WOOD].expectedMarketValue) * float64(materialCount)
 		buildChairValue = potentialChairValue - materialValue
 	}
 
+	// act out the best action
 	maxValueAction := math.Max(math.Max(doNothingValue, cutWoodValue), buildChairValue)
-
 	if maxValueAction == doNothingValue {
-		actor.markets[LEISURE].ownedGoods++
+		actor.markets[LEISURE].ownedGoods++ // we value doing nothing less and less the more we do it (diminishing utility)
 	} else {
 		if maxValueAction == cutWoodValue {
 			actor.markets[WOOD].ownedGoods++
@@ -60,7 +59,7 @@ func (actor *Actor) update() {
 			actor.markets[WOOD].ownedGoods -= materialCount
 			actor.markets[CHAIR].ownedGoods++
 		}
-		actor.markets[LEISURE].ownedGoods = 0
+		actor.markets[LEISURE].ownedGoods = 0 // make sure we have renewed value for doing nothing since we just did something
 	}
 
 	for good := range actor.markets {

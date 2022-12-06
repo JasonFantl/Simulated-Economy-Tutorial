@@ -31,7 +31,6 @@ func updateGraph() {
 }
 
 var previousDataPoints map[Good]map[*Actor][]dataPoint = map[Good]map[*Actor][]dataPoint{}
-var theoreticalPrices map[Good][]float64 = map[Good][]float64{}
 
 func GraphExpectedValues(screen *ebiten.Image, title string, good Good, drawXOff, drawYOff, drawXZoom, drawYZoom float64, jumpXAxis, jumpYAxis int) {
 
@@ -98,67 +97,5 @@ func GraphExpectedValues(screen *ebiten.Image, title string, good Good, drawXOff
 		}
 	}
 
-	// graph theoretical values
-	if len(theoreticalPrices) > 0 {
-		li := len(theoreticalPrices) - 1
-		x0, y0 := drawXOff+drawXZoom*float64(li), drawYOff-drawYZoom*theoreticalPrices[good][len(theoreticalPrices)-1]
-		col := color.RGBA{24, 100, 222, 100}
-		ebitenutil.DrawRect(persistentScreen, x0, y0-5, 10, 10, col)
-	}
-
 	screen.DrawImage(persistentScreen, nil)
-}
-
-func GraphGoodsVMoney(screen *ebiten.Image, good Good, drawXOff, drawYOff, drawXZoom, drawYZoom float64, jumpXAxis, jumpYAxis int) {
-
-	minX, maxX := 0.0, 0.0
-	minY, maxY := 0.0, 0.0
-
-	points := make([][]float64, len(actors))
-	i := 0
-	for actor := range actors {
-		x := actor.money
-		y := float64(actor.markets[good].ownedGoods)
-		points[i] = []float64{x, y}
-		if x < minX {
-			minX = x
-		}
-		if x > maxX {
-			maxX = x
-		}
-		if y < minY {
-			minY = y
-		}
-		if y > maxY {
-			maxY = y
-		}
-
-		i++
-	}
-
-	// title
-	ebitenutil.DebugPrintAt(screen, "Money", int(drawXOff)+40, int(drawYOff)+20)
-	ebitenutil.DebugPrintAt(screen, "Goods", int(drawXOff)-80, int(drawYOff)-60)
-
-	// X axis
-	ebitenutil.DrawLine(screen, drawXOff, drawYOff, drawXOff+drawXZoom*float64(maxX-minX), drawYOff, color.White)
-	for i := int(minX); i <= int(float64(maxX+1)); i += jumpXAxis {
-		ebitenutil.DebugPrintAt(screen, fmt.Sprintf("%d", i), int(drawXOff+drawXZoom*float64(i-int(minX))), int(drawYOff))
-	}
-
-	// Y axis
-	ebitenutil.DrawLine(screen, drawXOff, drawYOff, drawXOff, drawYOff-drawYZoom*float64(maxY-minY), color.White)
-	for i := int(minY); i <= int(maxY+1); i += jumpYAxis {
-		ebitenutil.DebugPrintAt(screen, fmt.Sprintf("%d", i), int(drawXOff)-20, int(drawYOff-drawYZoom*float64(i-int(minY))))
-	}
-
-	// 2d plot
-	for _, point := range points {
-		x := drawXOff + drawXZoom*point[0]
-		y := drawYOff - drawYZoom*point[1]
-		w := 10.0
-		h := 10.0
-		col := color.RGBA{143, 12, 3, 100}
-		ebitenutil.DrawRect(screen, x-w/2.0, y-h/2.0, w, h, col)
-	}
 }

@@ -23,34 +23,46 @@ func Update() {
 	}
 
 	iteration++
-	if iteration >= 200 && iteration < 600 {
+
+	// // termites
+	// if iteration >= 200 && iteration < 400 {
+	// 	for actor := range actors {
+	// 		if rand.Float64() < 0.5 && actor.markets[WOOD].ownedGoods > 0 {
+	// 			actor.markets[WOOD].ownedGoods--
+	// 		}
+	// 	}
+	// }
+
+	// // new forest
+	// if iteration == 600 {
+	// 	for actor := range actors {
+	// 		actor.markets[WOOD].ownedGoods += 100
+	// 	}
+	// }
+
+	// chairs not liked so much anymore
+	if iteration == 200 {
 		for actor := range actors {
-			if rand.Float64() < 0.5 && actor.markets[WOOD].ownedGoods > 0 {
-				actor.markets[WOOD].ownedGoods--
+			if rand.Float64() < 0.5 {
+				actor.markets[CHAIR].basePersonalValue *= 0.5
 			}
 		}
 	}
 
-	if iteration == 600 {
+	// government regulation
+	if iteration == 400 {
 		for actor := range actors {
-			actor.markets[WOOD].ownedGoods += 50
+			actor.markets[CHAIR].ownedGoods = 1
 		}
 	}
 
-	// switch iteration {
-	// // case 200:
-	// // 	for actor := range actors {
-	// // 		actor.markets[CHAIR].ownedGoods = 0
-	// // 	}
-	// case 500:
-	// 	for actor := range actors {
-	// 		actor.markets[CHAIR].ownedGoods *= 2
-	// 	}
-	// case 1000:
-	// 	for actor := range actors {
-	// 		actor.markets[WOOD].ownedGoods += 50
-	// 	}
-	// }
+	// government reparations
+	if iteration == 600 {
+		for actor := range actors {
+			actor.markets[CHAIR].ownedGoods = 30
+		}
+	}
+
 	updateGraph()
 }
 

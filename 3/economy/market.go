@@ -78,8 +78,8 @@ func (actor *Actor) updateMarket(good Good) {
 			}
 
 			// made it past all the checks, this is someone we can buy from
-			// actor.money -= sellingPrice
-			// otherActor.money += sellingPrice
+			actor.money -= sellingPrice
+			otherActor.money += sellingPrice
 			actor.markets[good].ownedGoods++
 			otherActor.markets[good].ownedGoods--
 			actor.markets[good].timeSinceLastTransaction, otherActor.markets[good].timeSinceLastTransaction = 0, 0
