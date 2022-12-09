@@ -38,13 +38,13 @@ func (actor *Actor) update() {
 	// evaluate all your actions
 	doNothingValue := actor.potentialPersonalValue(LEISURE)
 
-	cutWoodValue := math.Max(actor.potentialPersonalValue(WOOD), actor.markets[WOOD].expectedMarketPrice)
+	cutWoodValue := math.Max(actor.potentialPersonalValue(WOOD), actor.priceToValue(actor.markets[WOOD].expectedMarketPrice))
 
 	buildChairValue := 0.0
 	materialCount := 4
 	if actor.markets[WOOD].ownedGoods > materialCount {
-		potentialChairValue := math.Max(actor.potentialPersonalValue(CHAIR), actor.markets[CHAIR].expectedMarketPrice)
-		materialValue := math.Max(actor.currentPersonalValue(WOOD), actor.markets[WOOD].expectedMarketPrice) * float64(materialCount)
+		potentialChairValue := math.Max(actor.potentialPersonalValue(CHAIR), actor.priceToValue(actor.markets[CHAIR].expectedMarketPrice))
+		materialValue := math.Max(actor.currentPersonalValue(WOOD), actor.priceToValue(actor.markets[WOOD].expectedMarketPrice)) * float64(materialCount)
 		buildChairValue = potentialChairValue - materialValue
 	}
 

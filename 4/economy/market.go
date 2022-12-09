@@ -131,13 +131,14 @@ func (actor Actor) isBuyer(good Good) bool {
 }
 
 func (actor *Actor) priceToValue(price float64) float64 {
-	// simulates diminishing returns
-	// return value
-	return price * (0.9*(math.Pow(actor.money/1000, 3)+1.0) + 0.1)
+	return price * actor.utilityPerDollar()
 }
 
 func (actor *Actor) valueToPrice(value float64) float64 {
-	// simulates diminishing returns
-	// return value
-	return value / (0.9*(math.Pow(actor.money/1000, 3)+1.0) + 0.1)
+	return value / actor.utilityPerDollar()
+}
+
+func (actor *Actor) utilityPerDollar() float64 {
+	// utility per dollar has diminishing returns
+	return 1000.0 / (actor.money + 1.0)
 }

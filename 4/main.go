@@ -44,6 +44,10 @@ func (g *Game) Update() error {
 func (g *Game) Draw(screen *ebiten.Image) {
 	economy.GraphExpectedValues(screen, "Value of Wood", economy.WOOD, 100, 350, 1.0, 30.0, 100, 1)
 	economy.GraphExpectedValues(screen, "Value of Chairs", economy.CHAIR, 100, 750, 1.0, 8.0, 100, 5)
+
+	// economy.GraphGoodsVMoney(screen, "Wood V Money", economy.WOOD, 300, 300, 0.5, 10.0, 100, 5)
+	// economy.GraphGoodsVMoney(screen, "Chair V Money", economy.CHAIR, 300, 700, 0.5, 10.0, 100, 5)
+
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {

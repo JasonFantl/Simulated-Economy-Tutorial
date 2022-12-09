@@ -22,50 +22,29 @@ func Update() {
 
 	iteration++
 
-	// // termites
-	// if iteration >= 200 && iteration < 400 {
-	// 	for actor := range actors {
-	// 		if rand.Float64() < 0.5 && actor.markets[WOOD].ownedGoods > 0 {
-	// 			actor.markets[WOOD].ownedGoods--
-	// 		}
-	// 	}
-	// }
+	if iteration == 200 {
+		for actor := range actors {
+			actor.money += 1000
+		}
+	}
+	if iteration == 400 {
+		for actor := range actors {
+			actor.money -= 1000
+		}
+	}
 
-	// // new forest
-	// if iteration == 600 {
-	// 	for actor := range actors {
-	// 		actor.markets[WOOD].ownedGoods += 100
-	// 	}
-	// }
-
-	// // chairs not liked so much anymore
-	// if iteration == 200 {
-	// 	for actor := range actors {
-	// 		if rand.Float64() < 0.5 {
-	// 			actor.markets[CHAIR].basePersonalValue *= 0.5
-	// 		}
-	// 	}
-	// }
-
-	// // government regulation
-	// if iteration == 400 {
-	// 	for actor := range actors {
-	// 		actor.markets[CHAIR].ownedGoods = 1
-	// 	}
-	// }
-
-	// // government reparations
-	// if iteration == 600 {
-	// 	for actor := range actors {
-	// 		actor.markets[CHAIR].ownedGoods = 30
-	// 	}
-	// }
+	if iteration > 600 {
+		for actor := range actors {
+			actor.money += 10
+		}
+	}
 
 	updateGraph()
 }
 
 func Influence(good Good, value float64) {
 	// do something to influence the economy
+
 	// influenceNumPeople := 100
 	// for actor := range actors {
 	// 	newValue := actor.markets[good].ownedGoods + int(value)
@@ -79,6 +58,9 @@ func Influence(good Good, value float64) {
 	// }
 
 	for actor := range actors {
-		actor.money += value * 10
+		newValue := actor.money + value*10
+		if newValue >= 0 {
+			actor.money = newValue
+		}
 	}
 }
