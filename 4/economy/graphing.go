@@ -61,8 +61,8 @@ func GraphExpectedValues(screen *ebiten.Image, title string, good Good, drawXOff
 
 	// title
 	ebitenutil.DebugPrintAt(persistentScreen, title, int(drawXOff), int(drawYOff)+20)
-	ebitenutil.DebugPrintAt(persistentScreen, "Expected Market Values (Green = Buyer, Red = Seller)", int(drawXOff), int(drawYOff)+35)
-	ebitenutil.DebugPrintAt(persistentScreen, "Personal Values (Pink)", int(drawXOff), int(drawYOff)+50)
+	ebitenutil.DebugPrintAt(persistentScreen, "Expected Market Price (Green = Buyer, Red = Seller)", int(drawXOff), int(drawYOff)+35)
+	ebitenutil.DebugPrintAt(persistentScreen, "Personal Price (Pink)", int(drawXOff), int(drawYOff)+50)
 
 	// X axis
 	ebitenutil.DrawLine(persistentScreen, drawXOff, drawYOff, drawXOff+drawXZoom*maxX, drawYOff, color.White)
