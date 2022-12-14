@@ -3,78 +3,94 @@ package economy
 import (
 	"fmt"
 	"image/color"
+	"math"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 )
 
-var persistentScreen *ebiten.Image = nil
-
 type dataPoint struct {
-	expected, personal float64
-	buyer              bool
+	min, max float64
 }
 
-var previousDataPoints map[Location]map[Good]map[*Actor][]dataPoint = map[Location]map[Good]map[*Actor][]dataPoint{}
+var previousDataPoints map[Good]map[Location][]*dataPoint = map[Good]map[Location][]*dataPoint{}
 
 func updateGraph() {
+
+	datapoints := make(map[Location]map[Good]*dataPoint)
 	for actor := range actors {
 		for good, market := range actor.markets {
 			for location, expectedMarketPrice := range market.expectedMarketPrices {
-				if _, ok := previousDataPoints[location]; !ok {
-					previousDataPoints[location] = make(map[Good]map[*Actor][]dataPoint)
+				if _, ok := datapoints[location]; !ok {
+					datapoints[location] = make(map[Good]*dataPoint)
 				}
-				if _, ok := previousDataPoints[location][good]; !ok {
-					previousDataPoints[location][good] = make(map[*Actor][]dataPoint)
+				if _, ok := datapoints[location][good]; !ok {
+					datapoints[location][good] = &dataPoint{expectedMarketPrice, expectedMarketPrice}
+				} else {
+					if expectedMarketPrice < datapoints[location][good].min {
+						datapoints[location][good].min = expectedMarketPrice
+					} else if expectedMarketPrice > datapoints[location][good].max {
+						datapoints[location][good].max = expectedMarketPrice
+					}
 				}
-				if _, ok := previousDataPoints[location][good][actor]; !ok {
-					previousDataPoints[location][good][actor] = make([]dataPoint, 0)
-				}
-
-				previousDataPoints[location][good][actor] = append(previousDataPoints[location][good][actor], dataPoint{
-					expectedMarketPrice,
-					actor.valueToPrice(actor.currentPersonalValue(good)),
-					actor.isBuyer(good),
-				})
 			}
 		}
 	}
-}
 
-func GraphExpectedValues(screen *ebiten.Image, title string, location Location, good Good, drawXOff, drawYOff, drawXZoom, drawYZoom float64, jumpXAxis, jumpYAxis int) {
+	for location, goods := range datapoints {
+		for good, datapoint := range goods {
+			if _, ok := previousDataPoints[good]; !ok {
+				previousDataPoints[good] = make(map[Location][]*dataPoint)
+			}
+			if _, ok := previousDataPoints[good][location]; !ok {
+				previousDataPoints[good][location] = make([]*dataPoint, 0)
+			}
 
-	// setup persistent screen
-	if persistentScreen == nil {
-		persistentScreen = ebiten.NewImage(screen.Size())
+			previousDataPoints[good][location] = append(previousDataPoints[good][location], datapoint)
+		}
 	}
 
-	maxX := 0.0
+}
+
+func GraphExpectedValues(screen *ebiten.Image, title string, good Good, drawXOff, drawYOff, drawXZoom, drawYZoom float64, xRange, jumpXAxis, jumpYAxis int) {
+
+	minX, maxX := math.MaxInt, 0
 	maxY := 0.0
 
-	// add new data points (and get max/min X and Y values)
-	for actor := range actors {
-		v := float64(len(previousDataPoints[location][good][actor]))
+	for location := range previousDataPoints[good] {
+		// add new data points (and get max/min X and Y values)
+		v := len(previousDataPoints[good][location])
 		if v > maxX {
 			maxX = v
 		}
-		for _, v := range previousDataPoints[location][good][actor] {
-			if v.expected > maxY {
-				maxY = v.expected
+		if len(previousDataPoints[good][location])-xRange < minX {
+			minX = len(previousDataPoints[good][location]) - xRange
+		}
+		if minX < 0 {
+			minX = 0
+		}
+
+		for i, v := range previousDataPoints[good][location] {
+			if i > len(previousDataPoints[good][location])-xRange && v.max > maxY {
+				maxY = v.max
 			}
 		}
 	}
 
 	// title
-	ebitenutil.DebugPrintAt(persistentScreen, title+" ("+string(location)+")", int(drawXOff), int(drawYOff)+20)
-	ebitenutil.DebugPrintAt(persistentScreen, "Expected Market Price (Green = Buyer, Red = Seller)", int(drawXOff), int(drawYOff)+35)
-	ebitenutil.DebugPrintAt(persistentScreen, "Personal Price (Pink)", int(drawXOff), int(drawYOff)+50)
+	ebitenutil.DebugPrintAt(screen, title, int(drawXOff), int(drawYOff)+20)
+	ebitenutil.DebugPrintAt(screen, "(Green = Riverwood, Blue = Seaside)", int(drawXOff), int(drawYOff)+35)
 
 	// X axis
-	ebitenutil.DrawLine(persistentScreen, drawXOff, drawYOff, drawXOff+drawXZoom*maxX, drawYOff, color.White)
-	for i := 0; i < int(maxX)+jumpXAxis; i += jumpXAxis {
-		x := int(drawXOff + drawXZoom*(float64(i)))
+	ebitenutil.DrawLine(screen, drawXOff, drawYOff, drawXOff+drawXZoom*float64(maxX-minX), drawYOff, color.White)
+	for i := 0; i < (maxX-minX)+jumpXAxis; i += jumpXAxis {
+		lowerRounded := ((i + minX) / jumpXAxis) * jumpXAxis
+		if lowerRounded < minX {
+			continue
+		}
+		x := int(drawXOff + drawXZoom*(float64(lowerRounded-minX)))
 		y := int(drawYOff)
-		ebitenutil.DebugPrintAt(screen, fmt.Sprintf("%d", i), x, y)
+		ebitenutil.DebugPrintAt(screen, fmt.Sprintf("%d", lowerRounded), x, y)
 	}
 
 	// Y axis
@@ -82,31 +98,35 @@ func GraphExpectedValues(screen *ebiten.Image, title string, location Location, 
 	for i := 0; i < int(maxY)+jumpYAxis; i += jumpYAxis {
 		x := int(drawXOff)
 		y := int(drawYOff - drawYZoom*(float64(i)))
-		ebitenutil.DebugPrintAt(persistentScreen, fmt.Sprintf("%d", i), x-20, y-5)
+		ebitenutil.DebugPrintAt(screen, fmt.Sprintf("%d", i), x-20, y-5)
 	}
 
 	// graph data
-	for actor := range actors {
-		iteration := len(previousDataPoints[location][good][actor])
-		if iteration > 1 && actor.location == location {
+	for location := range previousDataPoints[good] {
+		i := 0
+		if len(previousDataPoints[good][location]) > xRange {
+			i = len(previousDataPoints[good][location]) - xRange
+		}
+		for ; i < len(previousDataPoints[good][location]); i++ {
 			// expected values
-			x0, y0 := drawXOff+drawXZoom*float64(iteration), drawYOff-drawYZoom*previousDataPoints[location][good][actor][iteration-2].expected
-			x1, y1 := drawXOff+drawXZoom*float64(iteration+1), drawYOff-drawYZoom*previousDataPoints[location][good][actor][iteration-1].expected
-			col := color.RGBA{143, 12, 3, 100}
-			if previousDataPoints[location][good][actor][iteration-1].buyer {
-				col = color.RGBA{50, 135, 0, 100}
-			}
-			ebitenutil.DrawLine(persistentScreen, x0, y0, x1, y1, col)
+			datapoint := previousDataPoints[good][location][i]
+			x, y := drawXOff+drawXZoom*float64(i-minX), drawYOff-drawYZoom*(datapoint.min+datapoint.max)/2.0
 
-			// personal values
-			x0, y0 = drawXOff+drawXZoom*float64(iteration), drawYOff-drawYZoom*previousDataPoints[location][good][actor][iteration-2].personal
-			x1, y1 = drawXOff+drawXZoom*float64(iteration+1), drawYOff-drawYZoom*previousDataPoints[location][good][actor][iteration-1].personal
-			col = color.RGBA{166, 0, 191, 30}
-			ebitenutil.DrawLine(persistentScreen, x0, y0, x1, y1, col)
+			col := color.RGBA{58, 158, 33, 100}
+			if location == SEASIDE {
+				col = color.RGBA{10, 159, 227, 100}
+			}
+
+			w := 1.0
+			h := datapoint.max - datapoint.min
+			if h < 2 {
+				h = 2
+			}
+			ebitenutil.DrawRect(screen, x-w/2.0, y-h/2.0, w, h, col)
+
+			// ebitenutil.DrawLine(screen, x0, y0, x1, y1, col)
 		}
 	}
-
-	screen.DrawImage(persistentScreen, nil)
 }
 
 func GraphGoodsVMoney(screen *ebiten.Image, title string, good Good, drawXOff, drawYOff, drawXZoom, drawYZoom float64, jumpXAxis, jumpYAxis int) {
