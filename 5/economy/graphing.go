@@ -20,18 +20,16 @@ func updateGraph() {
 	datapoints := make(map[Location]map[Good]*dataPoint)
 	for actor := range actors {
 		for good, market := range actor.markets {
-			for location, expectedMarketPrice := range market.expectedMarketPrices {
-				if _, ok := datapoints[location]; !ok {
-					datapoints[location] = make(map[Good]*dataPoint)
-				}
-				if _, ok := datapoints[location][good]; !ok {
-					datapoints[location][good] = &dataPoint{expectedMarketPrice, expectedMarketPrice}
-				} else {
-					if expectedMarketPrice < datapoints[location][good].min {
-						datapoints[location][good].min = expectedMarketPrice
-					} else if expectedMarketPrice > datapoints[location][good].max {
-						datapoints[location][good].max = expectedMarketPrice
-					}
+			if _, ok := datapoints[actor.location]; !ok {
+				datapoints[actor.location] = make(map[Good]*dataPoint)
+			}
+			if _, ok := datapoints[actor.location][good]; !ok {
+				datapoints[actor.location][good] = &dataPoint{market.expectedMarketPrice, market.expectedMarketPrice}
+			} else {
+				if market.expectedMarketPrice < datapoints[actor.location][good].min {
+					datapoints[actor.location][good].min = market.expectedMarketPrice
+				} else if market.expectedMarketPrice > datapoints[actor.location][good].max {
+					datapoints[actor.location][good].max = market.expectedMarketPrice
 				}
 			}
 		}
@@ -119,8 +117,8 @@ func GraphExpectedValues(screen *ebiten.Image, title string, good Good, drawXOff
 
 			w := 1.0
 			h := datapoint.max - datapoint.min
-			if h < 2 {
-				h = 2
+			if h < 3 {
+				h = 3
 			}
 			ebitenutil.DrawRect(screen, x-w/2.0, y-h/2.0, w, h, col)
 

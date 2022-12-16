@@ -12,6 +12,17 @@ const (
 	SEASIDE   Location = "Seaside"
 )
 
+var shippingCosts map[Location]map[Location]float64 = map[Location]map[Location]float64{
+	RIVERWOOD: {
+		RIVERWOOD: 0,
+		SEASIDE:   1,
+	},
+	SEASIDE: {
+		RIVERWOOD: 10,
+		SEASIDE:   0,
+	},
+}
+
 type Actor struct {
 	money    float64
 	location Location
@@ -31,9 +42,7 @@ func NewActor() *Actor {
 
 	// set expected prices to match our current value
 	for good, market := range actor.markets {
-		for location := range market.expectedMarketPrices {
-			market.expectedMarketPrices[location] = actor.currentPersonalValue(good)
-		}
+		market.expectedMarketPrice = actor.currentPersonalValue(good)
 	}
 
 	if rand.Float64() < 0.5 {
@@ -60,7 +69,7 @@ func (actor *Actor) update() {
 		// evaluate all your actions
 		doNothingValue := actor.potentialPersonalValue(LEISURE)
 
-		cutWoodValue := math.Max(actor.potentialPersonalValue(WOOD), actor.priceToValue(actor.markets[WOOD].expectedMarketPrices[actor.location]))
+		cutWoodValue := math.Max(actor.potentialPersonalValue(WOOD), actor.priceToValue(actor.markets[WOOD].expectedMarketPrice))
 		if actor.location == RIVERWOOD {
 			cutWoodValue *= 2
 		}
@@ -71,8 +80,8 @@ func (actor *Actor) update() {
 			materialCount = 2
 		}
 		if actor.markets[WOOD].ownedGoods > materialCount {
-			potentialChairValue := math.Max(actor.potentialPersonalValue(CHAIR), actor.priceToValue(actor.markets[CHAIR].expectedMarketPrices[actor.location]))
-			materialValue := math.Max(actor.currentPersonalValue(WOOD), actor.priceToValue(actor.markets[WOOD].expectedMarketPrices[actor.location])) * float64(materialCount)
+			potentialChairValue := math.Max(actor.potentialPersonalValue(CHAIR), actor.priceToValue(actor.markets[CHAIR].expectedMarketPrice))
+			materialValue := math.Max(actor.currentPersonalValue(WOOD), actor.priceToValue(actor.markets[WOOD].expectedMarketPrice)) * float64(materialCount)
 			buildChairValue = potentialChairValue - materialValue
 		}
 

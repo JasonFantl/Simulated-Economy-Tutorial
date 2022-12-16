@@ -1,5 +1,7 @@
 package economy
 
+import "fmt"
+
 var actors map[*Actor]bool
 
 func Initialize(size int) {
@@ -46,10 +48,6 @@ func Influence(good Good, value float64) {
 	// 	}
 	// }
 
-	for actor := range actors {
-		newValue := actor.money + value*10
-		if newValue >= 0 {
-			actor.money = newValue
-		}
-	}
+	shippingCosts[RIVERWOOD][SEASIDE] *= (value+1)/2 + 0.5
+	fmt.Println(shippingCosts[RIVERWOOD][SEASIDE])
 }

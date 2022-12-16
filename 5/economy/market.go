@@ -24,7 +24,7 @@ type Market struct {
 	timeSinceLastTransaction    int
 	maxTimeSinceLastTransaction int
 
-	expectedMarketPrices map[Location]float64
+	expectedMarketPrice float64
 }
 
 func NewMarket(owned int, baseValue, halfValueAt float64) *Market {
@@ -36,10 +36,7 @@ func NewMarket(owned int, baseValue, halfValueAt float64) *Market {
 		timeSinceLastTransaction:    0,
 		maxTimeSinceLastTransaction: 10,
 		gossipFrequency:             0.01,
-		expectedMarketPrices: map[Location]float64{
-			RIVERWOOD: (rand.Float64() - 0.5) + baseValue,
-			SEASIDE:   (rand.Float64() - 0.5) * baseValue,
-		},
+		expectedMarketPrice:         (rand.Float64() - 0.5) + baseValue,
 	}
 
 	return market
@@ -50,18 +47,19 @@ func (actor *Actor) updateMarket(good Good) {
 	// gossip, hear about other economies as well
 	if rand.Float64() < actor.markets[good].gossipFrequency {
 		for otherActor := range actors {
-			for location, otherExpectedPrice := range otherActor.markets[good].expectedMarketPrices {
-				if otherExpectedPrice > actor.markets[good].expectedMarketPrices[location] {
-					actor.markets[good].expectedMarketPrices[location] += actor.markets[good].beliefVolatility
-				} else if otherExpectedPrice < actor.markets[good].expectedMarketPrices[location] {
-					actor.markets[good].expectedMarketPrices[location] -= actor.markets[good].beliefVolatility
-				}
+			if actor.location != otherActor.location {
+				continue
+			}
+			otherExpectedPrice := otherActor.markets[good].expectedMarketPrice
+			if otherExpectedPrice > actor.markets[good].expectedMarketPrice {
+				actor.markets[good].expectedMarketPrice += actor.markets[good].beliefVolatility
+			} else if otherExpectedPrice < actor.markets[good].expectedMarketPrice {
+				actor.markets[good].expectedMarketPrice -= actor.markets[good].beliefVolatility
 			}
 			break
 		}
 	}
-
-	willingBuyPrice := actor.markets[good].expectedMarketPrices[actor.location]
+	willingBuyPrice := actor.markets[good].expectedMarketPrice
 
 	// only track failed time for when we could transact but didn't
 	if actor.isBuyer(good) && actor.money >= willingBuyPrice {
@@ -82,7 +80,7 @@ func (actor *Actor) updateMarket(good Good) {
 			if !otherActor.isSeller(good) || otherActor.markets[good].ownedGoods == 0 { // must be a seller with goods to sell
 				continue
 			}
-			sellingPrice := otherActor.markets[good].expectedMarketPrices[actor.location] // looking at the price tag
+			sellingPrice := otherActor.markets[good].expectedMarketPrice // looking at the price tag
 
 			if willingBuyPrice < sellingPrice || actor.money < sellingPrice { // the buyer is unwilling or unable to buy at this price
 				continue
@@ -94,8 +92,8 @@ func (actor *Actor) updateMarket(good Good) {
 			actor.markets[good].ownedGoods++
 			otherActor.markets[good].ownedGoods--
 			actor.markets[good].timeSinceLastTransaction, otherActor.markets[good].timeSinceLastTransaction = 0, 0
-			actor.markets[good].expectedMarketPrices[actor.location] -= actor.markets[good].beliefVolatility
-			otherActor.markets[good].expectedMarketPrices[actor.location] += actor.markets[good].beliefVolatility
+			actor.markets[good].expectedMarketPrice -= actor.markets[good].beliefVolatility
+			otherActor.markets[good].expectedMarketPrice += actor.markets[good].beliefVolatility
 			break
 		}
 	}
@@ -105,10 +103,10 @@ func (actor *Actor) updateMarket(good Good) {
 		actor.markets[good].timeSinceLastTransaction = 0
 		if actor.isBuyer(good) {
 			// need to be willing to pay more
-			actor.markets[good].expectedMarketPrices[actor.location] += actor.markets[good].beliefVolatility
+			actor.markets[good].expectedMarketPrice += actor.markets[good].beliefVolatility
 		} else if actor.isSeller(good) {
 			// need to be willing to sell for lower
-			actor.markets[good].expectedMarketPrices[actor.location] -= actor.markets[good].beliefVolatility
+			actor.markets[good].expectedMarketPrice -= actor.markets[good].beliefVolatility
 		}
 	}
 }
@@ -133,11 +131,11 @@ func (actor Actor) currentPersonalValue(good Good) float64 {
 }
 
 func (actor Actor) isSeller(good Good) bool {
-	return actor.priceToValue(actor.markets[good].expectedMarketPrices[actor.location]) > actor.currentPersonalValue(good)
+	return actor.priceToValue(actor.markets[good].expectedMarketPrice) > actor.currentPersonalValue(good)
 }
 
 func (actor Actor) isBuyer(good Good) bool {
-	return actor.priceToValue(actor.markets[good].expectedMarketPrices[actor.location]) < actor.potentialPersonalValue(good)
+	return actor.priceToValue(actor.markets[good].expectedMarketPrice) < actor.potentialPersonalValue(good)
 }
 
 func (actor *Actor) priceToValue(price float64) float64 {
