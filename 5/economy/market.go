@@ -43,14 +43,17 @@ func NewMarket(owned int, baseValue, halfValueAt float64) *Market {
 }
 
 func (actor *Actor) updateMarket(good Good) {
+	nearbyActors := make(map[EconomicActor]bool)
+	for otherActor := range actors {
+		if actor.location == otherActor.location {
+			nearbyActors[otherActor] = true
+		}
+	}
 
 	// gossip, hear about other economies as well
 	if rand.Float64() < actor.markets[good].gossipFrequency {
-		for otherActor := range actors {
-			if actor.location != otherActor.location {
-				continue
-			}
-			otherExpectedPrice := otherActor.markets[good].expectedMarketPrice
+		for otherActor := range nearbyActors {
+			otherExpectedPrice := otherActor.gossip(good)
 			if otherExpectedPrice > actor.markets[good].expectedMarketPrice {
 				actor.markets[good].expectedMarketPrice += actor.markets[good].beliefVolatility
 			} else if otherExpectedPrice < actor.markets[good].expectedMarketPrice {
@@ -72,28 +75,19 @@ func (actor *Actor) updateMarket(good Good) {
 	if actor.isBuyer(good) && actor.money >= willingBuyPrice {
 
 		// look for a seller, simulates going from shop to shop
-		for otherActor := range actors { // randomly iterates through everyone
-			if actor.location != otherActor.location { // must be in the same economy
+		for otherActor := range nearbyActors { // randomly iterates through everyone
+
+			isSeller, sellingPrice := otherActor.isSelling(good)
+			if !isSeller {
 				continue
 			}
-
-			if !otherActor.isSeller(good) || otherActor.markets[good].ownedGoods == 0 { // must be a seller with goods to sell
-				continue
-			}
-			sellingPrice := otherActor.markets[good].expectedMarketPrice // looking at the price tag
-
 			if willingBuyPrice < sellingPrice || actor.money < sellingPrice { // the buyer is unwilling or unable to buy at this price
 				continue
 			}
 
 			// made it past all the checks, this is someone we can buy from
-			actor.money -= sellingPrice
-			otherActor.money += sellingPrice
-			actor.markets[good].ownedGoods++
-			otherActor.markets[good].ownedGoods--
-			actor.markets[good].timeSinceLastTransaction, otherActor.markets[good].timeSinceLastTransaction = 0, 0
-			actor.markets[good].expectedMarketPrice -= actor.markets[good].beliefVolatility
-			otherActor.markets[good].expectedMarketPrice += actor.markets[good].beliefVolatility
+			actor.transact(good, true, sellingPrice)
+			otherActor.transact(good, false, sellingPrice)
 			break
 		}
 	}
@@ -122,7 +116,6 @@ func (actor Actor) personalValue(good Good, x int) float64 {
 // returns how much utility you would get from buying another good
 func (actor Actor) potentialPersonalValue(good Good) float64 {
 	return actor.personalValue(good, actor.markets[good].ownedGoods+1)
-
 }
 
 // how much utility you currently get from your good

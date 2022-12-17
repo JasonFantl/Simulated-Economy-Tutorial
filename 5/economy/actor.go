@@ -23,6 +23,12 @@ var shippingCosts map[Location]map[Location]float64 = map[Location]map[Location]
 	},
 }
 
+type EconomicActor interface {
+	isSelling(Good) (bool, float64)
+	transact(Good, bool, float64)
+	gossip(Good) float64
+}
+
 type Actor struct {
 	money    float64
 	location Location
@@ -65,7 +71,7 @@ func (actor *Actor) update() {
 		}
 	}
 
-	if float64(iteration)/300.0 > rand.Float64() {
+	if float64(iteration)/300.0 > rand.Float64() { // slow start the economy since initial conditions are all over the place
 		// evaluate all your actions
 		doNothingValue := actor.potentialPersonalValue(LEISURE)
 
@@ -108,4 +114,28 @@ func (actor *Actor) update() {
 			actor.updateMarket(good)
 		}
 	}
+}
+
+func (actor *Actor) isSelling(good Good) (bool, float64) {
+	if !actor.isSeller(good) || actor.markets[good].ownedGoods <= 0 {
+		return false, 0
+	}
+	return true, actor.markets[good].expectedMarketPrice
+}
+
+func (actor *Actor) transact(good Good, buying bool, price float64) {
+	actor.markets[good].timeSinceLastTransaction = 0
+	if buying {
+		actor.money -= price
+		actor.markets[good].ownedGoods++
+		actor.markets[good].expectedMarketPrice -= actor.markets[good].beliefVolatility
+	} else {
+		actor.money += price
+		actor.markets[good].ownedGoods--
+		actor.markets[good].expectedMarketPrice += actor.markets[good].beliefVolatility
+	}
+}
+
+func (actor *Actor) gossip(good Good) float64 {
+	return actor.markets[good].expectedMarketPrice
 }
