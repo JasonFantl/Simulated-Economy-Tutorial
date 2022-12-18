@@ -8,9 +8,9 @@ import (
 type Good string
 
 const (
-	WOOD    = "wood"
-	CHAIR   = "chair"
-	LEISURE = "leisure"
+	WOOD    Good = "wood"
+	CHAIR   Good = "chair"
+	LEISURE Good = "leisure"
 )
 
 type Market struct {
@@ -19,7 +19,7 @@ type Market struct {
 	basePersonalValue   float64
 	halfPersonalValueAt float64
 	beliefVolatility    float64
-	gossipFrequency     float64 // how likely an actor is to gossip with someone each frame. 0.01-0.1 seems to be a good range\
+	gossipFrequency     float64 // how likely an local is to gossip with someone each frame. 0.01-0.1 seems to be a good range\
 
 	timeSinceLastTransaction    int
 	maxTimeSinceLastTransaction int
@@ -42,37 +42,31 @@ func NewMarket(owned int, baseValue, halfValueAt float64) *Market {
 	return market
 }
 
-func (actor *Actor) updateMarket(good Good) {
-	nearbyActors := make(map[EconomicActor]bool)
-	for otherActor := range actors {
-		if actor.location == otherActor.location {
-			nearbyActors[otherActor] = true
-		}
-	}
+func (local *Local) updateMarket(good Good, nearbyActors map[EconomicActor]bool) {
 
 	// gossip, hear about other economies as well
-	if rand.Float64() < actor.markets[good].gossipFrequency {
+	if rand.Float64() < local.markets[good].gossipFrequency {
 		for otherActor := range nearbyActors {
 			otherExpectedPrice := otherActor.gossip(good)
-			if otherExpectedPrice > actor.markets[good].expectedMarketPrice {
-				actor.markets[good].expectedMarketPrice += actor.markets[good].beliefVolatility
-			} else if otherExpectedPrice < actor.markets[good].expectedMarketPrice {
-				actor.markets[good].expectedMarketPrice -= actor.markets[good].beliefVolatility
+			if otherExpectedPrice > local.markets[good].expectedMarketPrice {
+				local.markets[good].expectedMarketPrice += local.markets[good].beliefVolatility
+			} else if otherExpectedPrice < local.markets[good].expectedMarketPrice {
+				local.markets[good].expectedMarketPrice -= local.markets[good].beliefVolatility
 			}
 			break
 		}
 	}
-	willingBuyPrice := actor.markets[good].expectedMarketPrice
+	willingBuyPrice := local.markets[good].expectedMarketPrice
 
 	// only track failed time for when we could transact but didn't
-	if actor.isBuyer(good) && actor.money >= willingBuyPrice {
-		actor.markets[good].timeSinceLastTransaction++
-	} else if actor.isSeller(good) && actor.markets[good].ownedGoods > 0 {
-		actor.markets[good].timeSinceLastTransaction++
+	if local.isBuyer(good) && local.money >= willingBuyPrice {
+		local.markets[good].timeSinceLastTransaction++
+	} else if local.isSeller(good) && local.markets[good].ownedGoods > 0 {
+		local.markets[good].timeSinceLastTransaction++
 	}
 
 	// only buyers initiate transactions (usually buyers come to sellers, not the other way around)
-	if actor.isBuyer(good) && actor.money >= willingBuyPrice {
+	if local.isBuyer(good) && local.money >= willingBuyPrice {
 
 		// look for a seller, simulates going from shop to shop
 		for otherActor := range nearbyActors { // randomly iterates through everyone
@@ -81,65 +75,65 @@ func (actor *Actor) updateMarket(good Good) {
 			if !isSeller {
 				continue
 			}
-			if willingBuyPrice < sellingPrice || actor.money < sellingPrice { // the buyer is unwilling or unable to buy at this price
+			if willingBuyPrice < sellingPrice || local.money < sellingPrice { // the buyer is unwilling or unable to buy at this price
 				continue
 			}
 
 			// made it past all the checks, this is someone we can buy from
-			actor.transact(good, true, sellingPrice)
+			local.transact(good, true, sellingPrice)
 			otherActor.transact(good, false, sellingPrice)
 			break
 		}
 	}
 
 	// if we haven't transacted in a while then update expected values
-	if actor.markets[good].timeSinceLastTransaction > actor.markets[good].maxTimeSinceLastTransaction {
-		actor.markets[good].timeSinceLastTransaction = 0
-		if actor.isBuyer(good) {
+	if local.markets[good].timeSinceLastTransaction > local.markets[good].maxTimeSinceLastTransaction {
+		local.markets[good].timeSinceLastTransaction = 0
+		if local.isBuyer(good) {
 			// need to be willing to pay more
-			actor.markets[good].expectedMarketPrice += actor.markets[good].beliefVolatility
-		} else if actor.isSeller(good) {
+			local.markets[good].expectedMarketPrice += local.markets[good].beliefVolatility
+		} else if local.isSeller(good) {
 			// need to be willing to sell for lower
-			actor.markets[good].expectedMarketPrice -= actor.markets[good].beliefVolatility
+			local.markets[good].expectedMarketPrice -= local.markets[good].beliefVolatility
 		}
 	}
 }
 
 // should not be called anywhere except from potentialValue and currentValue
-func (actor Actor) personalValue(good Good, x int) float64 {
-	S := actor.markets[good].basePersonalValue
-	D := actor.markets[good].halfPersonalValueAt
+func (local Local) personalValue(good Good, x int) float64 {
+	S := local.markets[good].basePersonalValue
+	D := local.markets[good].halfPersonalValueAt
 	// simulates diminishing returns
 	return S / (math.Pow(float64(x)/D, 3) + 1.0)
 }
 
 // returns how much utility you would get from buying another good
-func (actor Actor) potentialPersonalValue(good Good) float64 {
-	return actor.personalValue(good, actor.markets[good].ownedGoods+1)
+func (local Local) potentialPersonalValue(good Good) float64 {
+	return local.personalValue(good, local.markets[good].ownedGoods+1)
 }
 
 // how much utility you currently get from your good
-func (actor Actor) currentPersonalValue(good Good) float64 {
-	return actor.personalValue(good, actor.markets[good].ownedGoods)
+func (local Local) currentPersonalValue(good Good) float64 {
+	return local.personalValue(good, local.markets[good].ownedGoods)
 }
 
-func (actor Actor) isSeller(good Good) bool {
-	return actor.priceToValue(actor.markets[good].expectedMarketPrice) > actor.currentPersonalValue(good)
+func (local Local) isSeller(good Good) bool {
+	return local.priceToValue(local.markets[good].expectedMarketPrice) > local.currentPersonalValue(good)
 }
 
-func (actor Actor) isBuyer(good Good) bool {
-	return actor.priceToValue(actor.markets[good].expectedMarketPrice) < actor.potentialPersonalValue(good)
+func (local Local) isBuyer(good Good) bool {
+	return local.priceToValue(local.markets[good].expectedMarketPrice) < local.potentialPersonalValue(good)
 }
 
-func (actor *Actor) priceToValue(price float64) float64 {
-	return price * actor.utilityPerDollar()
+func (local *Local) priceToValue(price float64) float64 {
+	return price * local.utilityPerDollar()
 }
 
-func (actor *Actor) valueToPrice(value float64) float64 {
-	return value / actor.utilityPerDollar()
+func (local *Local) valueToPrice(value float64) float64 {
+	return value / local.utilityPerDollar()
 }
 
-func (actor *Actor) utilityPerDollar() float64 {
+func (local *Local) utilityPerDollar() float64 {
 	// utility per dollar has diminishing returns
-	return 1000.0 / (actor.money + 1.0)
+	return 1000.0 / (local.money + 1.0)
 }

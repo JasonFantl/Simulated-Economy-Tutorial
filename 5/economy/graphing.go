@@ -18,18 +18,18 @@ var previousDataPoints map[Good]map[Location][]*dataPoint = map[Good]map[Locatio
 func updateGraph() {
 
 	datapoints := make(map[Location]map[Good]*dataPoint)
-	for actor := range actors {
-		for good, market := range actor.markets {
-			if _, ok := datapoints[actor.location]; !ok {
-				datapoints[actor.location] = make(map[Good]*dataPoint)
+	for local := range locals {
+		for good, market := range local.markets {
+			if _, ok := datapoints[local.location]; !ok {
+				datapoints[local.location] = make(map[Good]*dataPoint)
 			}
-			if _, ok := datapoints[actor.location][good]; !ok {
-				datapoints[actor.location][good] = &dataPoint{market.expectedMarketPrice, market.expectedMarketPrice}
+			if _, ok := datapoints[local.location][good]; !ok {
+				datapoints[local.location][good] = &dataPoint{market.expectedMarketPrice, market.expectedMarketPrice}
 			} else {
-				if market.expectedMarketPrice < datapoints[actor.location][good].min {
-					datapoints[actor.location][good].min = market.expectedMarketPrice
-				} else if market.expectedMarketPrice > datapoints[actor.location][good].max {
-					datapoints[actor.location][good].max = market.expectedMarketPrice
+				if market.expectedMarketPrice < datapoints[local.location][good].min {
+					datapoints[local.location][good].min = market.expectedMarketPrice
+				} else if market.expectedMarketPrice > datapoints[local.location][good].max {
+					datapoints[local.location][good].max = market.expectedMarketPrice
 				}
 			}
 		}
@@ -137,20 +137,19 @@ func GraphGoodsVMoney(screen *ebiten.Image, title string, good Good, drawXOff, d
 	minX, maxX := 0.0, 0.0
 	minY, maxY := 0.0, 0.0
 
-	points := make([]dataPoint, len(actors))
-	i := 0
-	for actor := range actors {
-		x := actor.money
-		y := float64(actor.markets[good].ownedGoods)
+	points := make([]dataPoint, 0)
+	for local := range locals {
+		x := local.money
+		y := float64(local.markets[good].ownedGoods)
 		col := color.RGBA{58, 158, 33, 100}
-		if actor.location == SEASIDE {
+		if local.location == SEASIDE {
 			col = color.RGBA{10, 159, 227, 100}
 		}
-		points[i] = dataPoint{
+		points = append(points, dataPoint{
 			x:   x,
 			y:   y,
 			col: col,
-		}
+		})
 		if x < minX {
 			minX = x
 		}
@@ -163,8 +162,33 @@ func GraphGoodsVMoney(screen *ebiten.Image, title string, good Good, drawXOff, d
 		if y > maxY {
 			maxY = y
 		}
+	}
 
-		i++
+	for merchant := range merchants {
+		x := merchant.money
+		y := float64(merchant.ownedGoods[good])
+		col := color.RGBA{200, 158, 33, 200}
+		if merchant.location == SEASIDE {
+			col = color.RGBA{250, 58, 33, 200}
+		}
+
+		points = append(points, dataPoint{
+			x:   x,
+			y:   y,
+			col: col,
+		})
+		if x < minX {
+			minX = x
+		}
+		if x > maxX {
+			maxX = x
+		}
+		if y < minY {
+			minY = y
+		}
+		if y > maxY {
+			maxY = y
+		}
 	}
 
 	// title

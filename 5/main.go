@@ -28,13 +28,13 @@ func (g *Game) Update() error {
 		if p == ebiten.KeyEscape {
 			return errors.New("user quit")
 		} else if p == ebiten.KeyArrowUp {
-			economy.Influence(economy.CHAIR, 1)
+			economy.Influence(economy.RIVERWOOD, 1)
 		} else if p == ebiten.KeyArrowDown {
-			economy.Influence(economy.CHAIR, -1)
+			economy.Influence(economy.RIVERWOOD, -1)
 		} else if p == ebiten.KeyArrowLeft {
-			economy.Influence(economy.WOOD, 1)
+			economy.Influence(economy.SEASIDE, 1)
 		} else if p == ebiten.KeyArrowRight {
-			economy.Influence(economy.WOOD, -1)
+			economy.Influence(economy.SEASIDE, -1)
 		}
 	}
 
