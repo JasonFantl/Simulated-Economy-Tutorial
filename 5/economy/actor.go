@@ -17,10 +17,10 @@ type Local struct {
 	markets  map[Good]*Market
 }
 
-func NewLocal() *Local {
+func NewLocal(location Location) *Local {
 	local := &Local{
 		money:    1000,
-		location: RIVERWOOD,
+		location: location,
 		markets: map[Good]*Market{
 			WOOD:    NewMarket(rand.Intn(20), 4+rand.Float64()*4, 15),
 			CHAIR:   NewMarket(rand.Intn(20), 30+rand.Float64()*20, 10),
@@ -31,10 +31,6 @@ func NewLocal() *Local {
 	// set expected prices to match our current value
 	for good, market := range local.markets {
 		market.expectedMarketPrice = local.currentPersonalValue(good)
-	}
-
-	if rand.Float64() < 0.5 {
-		local.location = SEASIDE
 	}
 
 	return local
@@ -53,7 +49,7 @@ func (local *Local) update() {
 		}
 	}
 
-	if float64(iteration)/300.0 > rand.Float64() { // slow start the economy since initial conditions are all over the place
+	if float64(iteration)/250.0 > rand.Float64() { // slow start the economy since initial conditions are all over the place
 		// evaluate all your actions
 		doNothingValue := local.potentialPersonalValue(LEISURE)
 
@@ -79,7 +75,8 @@ func (local *Local) update() {
 			local.markets[LEISURE].ownedGoods++ // we value doing nothing less and less the more we do it (diminishing utility)
 		} else {
 			if maxValueAction == cutWoodValue {
-				if !(local.location == SEASIDE && rand.Float64() > 0.5) {
+				local.markets[WOOD].ownedGoods++
+				if local.location == RIVERWOOD {
 					local.markets[WOOD].ownedGoods++
 				}
 			} else if maxValueAction == buildChairValue {

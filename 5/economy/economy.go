@@ -10,7 +10,22 @@ func Initialize(size int) {
 	merchants = make(map[*Merchant]bool)
 
 	for i := 0; i < size; i++ {
-		locals[NewLocal()] = true
+		location := RIVERWOOD
+		if i%2 == 0 {
+			location = SEASIDE
+		}
+		locals[NewLocal(location)] = true
+	}
+	for i := 0; i < size/4; i++ {
+		location := RIVERWOOD
+		good := WOOD
+		if i%2 == 0 {
+			location = SEASIDE
+		}
+		if i%3 == 0 {
+			good = CHAIR
+		}
+		merchants[NewMerchant(location, good)] = true
 	}
 }
 
@@ -29,10 +44,11 @@ func Update() {
 
 	iteration++
 
-	if iteration == 200 {
-		for i := 0; i < 10; i++ {
-			merchants[NewMerchant()] = true
-		}
+	if iteration == 500 {
+		movingCosts[RIVERWOOD][SEASIDE] = 0
+	}
+	if iteration == 1000 {
+		movingCosts[SEASIDE][RIVERWOOD] = 0
 	}
 
 	updateGraph()

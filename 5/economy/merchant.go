@@ -1,6 +1,7 @@
 package economy
 
 import (
+	"fmt"
 	"math/rand"
 )
 
@@ -14,29 +15,30 @@ const (
 var movingCosts map[Location]map[Location]float64 = map[Location]map[Location]float64{
 	RIVERWOOD: {
 		RIVERWOOD: 0,
-		SEASIDE:   0.5,
+		SEASIDE:   100,
 	},
 	SEASIDE: {
-		RIVERWOOD: 10,
+		RIVERWOOD: 100,
 		SEASIDE:   0,
 	},
 }
 
 type Merchant struct {
-	money          float64
-	location       Location
-	ownedGoods     map[Good]int
-	expectedPrices map[Good]map[Location]float64 // merchants use this instead of the value in the market
+	money            float64
+	location         Location
+	buysSells        Good
+	carryingCapacity int
+	owned            int
+	expectedPrices   map[Good]map[Location]float64 // merchants use this instead of the value in the market
 }
 
-func NewMerchant() *Merchant {
+func NewMerchant(location Location, good Good) *Merchant {
 	merchant := &Merchant{
-		money:    1000,
-		location: RIVERWOOD,
-		ownedGoods: map[Good]int{
-			WOOD:  0,
-			CHAIR: 0,
-		},
+		money:            1000,
+		location:         location,
+		buysSells:        good,
+		carryingCapacity: 20,
+		owned:            0,
 		expectedPrices: map[Good]map[Location]float64{
 			WOOD: {
 				RIVERWOOD: 0,
@@ -49,14 +51,10 @@ func NewMerchant() *Merchant {
 		},
 	}
 
-	if rand.Float64() < 0.5 {
-		merchant.location = SEASIDE
-	}
-
 	// immediately get the appropriate expected values
-	for good, prices := range merchant.expectedPrices {
-		for local := range locals {
-			merchant.expectedPrices[good][local.location] = 0.5*prices[local.location] + 0.5*local.markets[good].expectedMarketPrice
+	for local := range locals {
+		for good := range merchant.expectedPrices {
+			merchant.expectedPrices[good][local.location] = 0.5*merchant.expectedPrices[good][local.location] + 0.5*local.markets[good].expectedMarketPrice
 		}
 	}
 
@@ -71,27 +69,23 @@ func (merchant *Merchant) update() {
 
 	// get some gossip
 	for local := range locals {
-		for good, prices := range merchant.expectedPrices {
-			merchant.expectedPrices[good][local.location] = 0.9*prices[local.location] + 0.1*local.markets[good].expectedMarketPrice
+		for good := range merchant.expectedPrices {
+			merchant.expectedPrices[good][local.location] = 0.9*merchant.expectedPrices[good][local.location] + 0.1*local.markets[good].expectedMarketPrice
 		}
 	}
 
-	// look to buy goods
-	for good, prices := range merchant.expectedPrices {
-		willingBuyPrice := prices[merchant.location]
-		bestSellLocation, bestSellProfit := merchant.bestSellProfit(good)
+	// look to buy
+	willingBuyPrice := merchant.expectedPrices[merchant.buysSells][merchant.location]
+	bestSellLocation, bestSellProfit := merchant.bestSellProfit(merchant.buysSells)
 
-		if bestSellLocation == merchant.location { // no possible profit by buying and selling in same location
-			continue
-		}
-
+	if bestSellLocation != merchant.location && merchant.owned < merchant.carryingCapacity { // no possible profit by buying and selling in same location
 		// try and find someone to buy from
 		for otherActor := range locals {
 			if merchant.location != otherActor.location { // needs to be in the same city
 				continue
 			}
 
-			isSeller, sellingPrice := otherActor.isSelling(good)
+			isSeller, sellingPrice := otherActor.isSelling(merchant.buysSells)
 			if !isSeller {
 				continue
 			}
@@ -105,8 +99,8 @@ func (merchant *Merchant) update() {
 			}
 
 			// made it past all the checks, this is someone we can buy from
-			merchant.transact(good, true, sellingPrice)
-			otherActor.transact(good, false, sellingPrice)
+			merchant.transact(merchant.buysSells, true, sellingPrice)
+			otherActor.transact(merchant.buysSells, false, sellingPrice)
 			break
 		}
 	}
@@ -115,23 +109,35 @@ func (merchant *Merchant) update() {
 	if rand.Intn(100) == 0 {
 		// currently the moving cost is not payed, but it is considered in setting prices
 		locations := []Location{RIVERWOOD, SEASIDE}
-		newLocation := locations[rand.Intn(len(locations))]
-		if newLocation != merchant.location {
-			merchant.location = newLocation
-		}
+		merchant.location = locations[rand.Intn(len(locations))]
 	}
-	// change cities once we bought our goods in bulk
-	if merchant.ownedGoods[WOOD] >= 40 && merchant.location == RIVERWOOD {
-		merchant.location = SEASIDE
+
+	// change cities once we bought our good in bulk
+	if merchant.owned >= merchant.carryingCapacity && merchant.location != bestSellLocation {
+		merchant.location = bestSellLocation
+	}
+
+	// consider switching professions if we aren't selling right now
+	if merchant.owned == 0 {
+		bestGood, bestProfit := WOOD, 0.0
+		for good, expectedPrices := range merchant.expectedPrices {
+			_, sellProfit := merchant.bestSellProfit(good)
+			potentialProfit := sellProfit - expectedPrices[merchant.location] // profit = sell price - buy price
+			if potentialProfit > bestProfit {
+				bestProfit = potentialProfit
+				bestGood = good
+			}
+		}
+		merchant.buysSells = bestGood
 	}
 }
 
 func (merchant *Merchant) isSelling(good Good) (bool, float64) {
-	if merchant.ownedGoods[good] <= 0 {
+	if good != merchant.buysSells || merchant.owned <= 0 {
 		return false, 0
 	}
 
-	bestLocation, bestProfit := merchant.bestSellProfit(good)
+	bestLocation, bestProfit := merchant.bestSellProfit(merchant.buysSells)
 
 	// only sell if we are in the best place to sell
 	if merchant.location == bestLocation {
@@ -141,14 +147,18 @@ func (merchant *Merchant) isSelling(good Good) (bool, float64) {
 }
 
 func (merchant *Merchant) transact(good Good, buying bool, price float64) {
+	if good != merchant.buysSells {
+		fmt.Printf("Merchant somehow transacted a good they don't deal in")
+		return
+	}
 	if buying {
 		// fmt.Printf("Bought \t%s \t%s \t%f\n", good, merchant.location, price)
 		merchant.money -= price
-		merchant.ownedGoods[good]++
+		merchant.owned++
 	} else {
 		// fmt.Printf("Sold \t%s \t%s \t%f\n", good, merchant.location, price)
 		merchant.money += price
-		merchant.ownedGoods[good]--
+		merchant.owned--
 	}
 }
 

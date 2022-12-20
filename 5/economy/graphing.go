@@ -165,8 +165,11 @@ func GraphGoodsVMoney(screen *ebiten.Image, title string, good Good, drawXOff, d
 	}
 
 	for merchant := range merchants {
+		if good != merchant.buysSells {
+			continue
+		}
 		x := merchant.money
-		y := float64(merchant.ownedGoods[good])
+		y := float64(merchant.owned)
 		col := color.RGBA{200, 158, 33, 200}
 		if merchant.location == SEASIDE {
 			col = color.RGBA{250, 58, 33, 200}
