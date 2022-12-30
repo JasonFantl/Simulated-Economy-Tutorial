@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image/color"
 	"math"
+	"strconv"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
@@ -25,19 +26,22 @@ var previousDataPoints map[Good]map[Location][]*dataPoint = map[Good]map[Locatio
 func updateGraph() {
 
 	datapoints := make(map[Location]map[Good]*dataPoint)
+	for _, location := range locations {
+		datapoints[location] = make(map[Good]*dataPoint)
+		for _, good := range goods {
+			datapoints[location][good] = &dataPoint{math.MaxFloat64, -math.MaxFloat64}
+		}
+	}
 	for local := range locals {
 		for good, market := range local.markets {
-			if _, ok := datapoints[local.location]; !ok {
-				datapoints[local.location] = make(map[Good]*dataPoint)
+			if good == LEISURE {
+				continue
 			}
-			if _, ok := datapoints[local.location][good]; !ok {
-				datapoints[local.location][good] = &dataPoint{market.expectedMarketPrice, market.expectedMarketPrice}
-			} else {
-				if market.expectedMarketPrice < datapoints[local.location][good].min {
-					datapoints[local.location][good].min = market.expectedMarketPrice
-				} else if market.expectedMarketPrice > datapoints[local.location][good].max {
-					datapoints[local.location][good].max = market.expectedMarketPrice
-				}
+			if market.expectedMarketPrice < datapoints[local.location][good].min {
+				datapoints[local.location][good].min = market.expectedMarketPrice
+			}
+			if market.expectedMarketPrice > datapoints[local.location][good].max {
+				datapoints[local.location][good].max = market.expectedMarketPrice
 			}
 		}
 	}
@@ -232,9 +236,9 @@ func GraphLeisureVWealth(screen *ebiten.Image, title string, drawXOff, drawYOff,
 	points := make([]dataPoint, 0)
 	for local := range locals {
 		x := local.money
-		for _, market := range local.markets {
-			x += market.expectedMarketPrice * float64(market.ownedGoods)
-		}
+		// for _, market := range local.markets {
+		// 	x += market.expectedMarketPrice * float64(market.ownedGoods)
+		// }
 		y := float64(local.markets[LEISURE].basePersonalValue)
 		col := locationColors[local.location]
 
@@ -280,5 +284,34 @@ func GraphLeisureVWealth(screen *ebiten.Image, title string, drawXOff, drawYOff,
 		h := 5.0
 
 		ebitenutil.DrawRect(screen, x-w/2.0, y-h/2.0, w, h, point.col)
+	}
+}
+
+func GraphMerchantType(screen *ebiten.Image, title string, drawXOff, drawYOff, drawXZoom, drawYZoom float64) {
+
+	points := make(map[Good]int)
+	for _, good := range goods {
+		points[good] = 0
+	}
+	for merchant := range merchants {
+		points[merchant.buysSells]++
+	}
+
+	// title
+	ebitenutil.DebugPrintAt(screen, title, int(drawXOff), int(drawYOff)+60)
+
+	// 2d plot
+	xIndex := 0.0
+	for _, good := range goods {
+		x := drawXOff + drawXZoom*xIndex
+		y := drawYOff
+		w := drawXZoom * 0.9
+		h := float64(points[good]) * drawYZoom
+
+		ebitenutil.DrawRect(screen, x, y-h, w, h, color.RGBA{100, 100, 100, 255})
+		ebitenutil.DebugPrintAt(screen, string(good), int(x), int(y)+20)
+		ebitenutil.DebugPrintAt(screen, strconv.Itoa(points[good]), int(x), int(y)+40)
+
+		xIndex++
 	}
 }

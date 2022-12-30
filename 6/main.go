@@ -42,17 +42,19 @@ func (g *Game) Update() error {
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
-	economy.GraphExpectedValues(screen, "Price of Wood", economy.WOOD, 100, 200, 0.5, 40.0, 800, 100, 1)
-	economy.GraphExpectedValues(screen, "Price of Chairs", economy.CHAIR, 100, 400, 0.5, 8.0, 800, 100, 5)
-	economy.GraphExpectedValues(screen, "Price of Thread", economy.THREAD, 100, 600, 0.5, 20.0, 800, 100, 1)
-	economy.GraphExpectedValues(screen, "Price of Bed", economy.BED, 100, 800, 0.5, 1.0, 800, 100, 20)
+	economy.GraphExpectedValues(screen, "Price of Wood", economy.WOOD, 100, 300, 0.5, 40.0, 800, 100, 1)
+	economy.GraphExpectedValues(screen, "Price of Chairs", economy.CHAIR, 100, 600, 0.5, 8.0, 800, 100, 5)
+	economy.GraphExpectedValues(screen, "Price of Thread", economy.THREAD, 600, 300, 0.5, 30.0, 800, 100, 1)
+	economy.GraphExpectedValues(screen, "Price of Bed", economy.BED, 600, 600, 0.5, 4.0, 800, 100, 10)
 
-	economy.GraphGoodsVMoney(screen, "Wood V Money", economy.WOOD, 600, 200, 0.1, 4.0, 250, 10)
-	economy.GraphGoodsVMoney(screen, "Chair V Money", economy.CHAIR, 600, 400, 0.1, 4.0, 250, 10)
-	economy.GraphGoodsVMoney(screen, "Thread V Money", economy.THREAD, 600, 600, 0.1, 2.0, 250, 10)
-	economy.GraphGoodsVMoney(screen, "Bed V Money", economy.BED, 600, 800, 0.1, 20.0, 250, 1)
+	// economy.GraphGoodsVMoney(screen, "Wood V Money", economy.WOOD, 600, 200, 0.1, 4.0, 250, 10)
+	// economy.GraphGoodsVMoney(screen, "Chair V Money", economy.CHAIR, 600, 400, 0.1, 4.0, 250, 10)
+	// economy.GraphGoodsVMoney(screen, "Thread V Money", economy.THREAD, 600, 600, 0.1, 2.0, 250, 10)
+	// economy.GraphGoodsVMoney(screen, "Bed V Money", economy.BED, 600, 800, 0.1, 20.0, 250, 1)
 
-	economy.GraphLeisureVWealth(screen, "Leisure V Wealth", 900, 400, 0.1, 10, 250, 2)
+	economy.GraphLeisureVWealth(screen, "Leisure V Wealth", 500, 800, 0.1, 10, 250, 2)
+
+	economy.GraphMerchantType(screen, "Merchant types", 100, 800, 50, 5)
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {

@@ -14,31 +14,34 @@ const (
 	PORTSVILLE Location = "Portsville"
 )
 
+var locations = []Location{RIVERWOOD, SEASIDE, WINTERHOLD, PORTSVILLE}
+
 var movingCosts map[Location]map[Location]float64 = map[Location]map[Location]float64{
 	RIVERWOOD: {
-		RIVERWOOD:  0,
 		SEASIDE:    100,
 		WINTERHOLD: 100,
 		PORTSVILLE: 100,
 	},
 	SEASIDE: {
 		RIVERWOOD:  100,
-		SEASIDE:    0,
 		WINTERHOLD: 100,
 		PORTSVILLE: 100,
 	},
 	WINTERHOLD: {
 		RIVERWOOD:  100,
 		SEASIDE:    100,
-		WINTERHOLD: 0,
 		PORTSVILLE: 100,
 	},
 	PORTSVILLE: {
 		RIVERWOOD:  100,
 		SEASIDE:    100,
 		WINTERHOLD: 100,
-		PORTSVILLE: 0,
 	},
+}
+
+func setTravelingCost(from, to Location, cost float64) {
+	movingCosts[to][from] = cost
+	movingCosts[from][to] = cost
 }
 
 type Merchant struct {
@@ -57,24 +60,15 @@ func NewMerchant(location Location, good Good) *Merchant {
 		buysSells:        good,
 		carryingCapacity: 20,
 		owned:            0,
-		expectedPrices: map[Good]map[Location]float64{
-			WOOD: {
-				RIVERWOOD: 0,
-				SEASIDE:   0,
-			},
-			CHAIR: {
-				RIVERWOOD: 0,
-				SEASIDE:   0,
-			},
-			THREAD: {
-				RIVERWOOD: 0,
-				SEASIDE:   0,
-			},
-			BED: {
-				RIVERWOOD: 0,
-				SEASIDE:   0,
-			},
-		},
+		expectedPrices:   map[Good]map[Location]float64{},
+	}
+
+	// initialize expected prices
+	for _, good := range goods {
+		merchant.expectedPrices[good] = make(map[Location]float64)
+		for _, location := range locations {
+			merchant.expectedPrices[good][location] = 0
+		}
 	}
 
 	// immediately get the appropriate expected values
@@ -131,11 +125,21 @@ func (merchant *Merchant) update() {
 		}
 	}
 
-	// randomly switch towns, could be a lot smarter about this
+	// randomly move cities, but weight by moving costs so high cost cities are less likely to go to
 	if rand.Intn(100) == 0 {
 		// currently the moving cost is not payed, but it is considered in setting prices
-		locations := []Location{RIVERWOOD, SEASIDE}
-		merchant.location = locations[rand.Intn(len(locations))]
+		totalCosts := 0.0
+		for _, cost := range movingCosts[merchant.location] {
+			totalCosts += 1 / cost
+		}
+		for location, cost := range movingCosts[merchant.location] {
+			if rand.Float64()*totalCosts < 1/cost {
+				merchant.location = location
+				break
+			} else {
+				totalCosts -= 1 / cost
+			}
+		}
 	}
 
 	// change cities once we bought our good in bulk
@@ -185,6 +189,10 @@ func (merchant *Merchant) transact(good Good, buying bool, price float64) {
 		// fmt.Printf("Sold \t%s \t%s \t%f\n", good, merchant.location, price)
 		merchant.money += price
 		merchant.owned--
+	}
+
+	if merchant.location == RIVERWOOD && iteration > 500 {
+		fmt.Printf("Merchant transacted %s for %f, bought: %t\n", good, price, buying)
 	}
 }
 

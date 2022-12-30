@@ -60,21 +60,22 @@ func (local *Local) update() {
 
 	if float64(iteration)/250.0 > rand.Float64() { // slow start the economy since initial conditions are all over the place
 		// evaluate all your actions
+
 		doNothingValue := local.potentialPersonalValue(LEISURE)
 
 		cutWoodValue := math.Max(local.potentialPersonalValue(WOOD), local.priceToValue(local.markets[WOOD].expectedMarketPrice))
-		if local.location == RIVERWOOD {
+		if specialized && local.location == RIVERWOOD {
 			cutWoodValue *= 2
 		}
 
 		spinThreadValue := math.Max(local.potentialPersonalValue(THREAD), local.priceToValue(local.markets[THREAD].expectedMarketPrice))
-		if local.location == PORTSVILLE {
+		if specialized && local.location == PORTSVILLE {
 			spinThreadValue *= 3
 		}
 
 		buildChairValue := 0.0
 		materialCount := 4
-		if local.location == SEASIDE {
+		if specialized && local.location == SEASIDE {
 			materialCount = 2
 		}
 		if local.markets[WOOD].ownedGoods > materialCount {
@@ -86,7 +87,7 @@ func (local *Local) update() {
 		buildBedValue := 0.0
 		materialWoodCount := 2
 		materialThreadCount := 10
-		if local.location == WINTERHOLD {
+		if specialized && local.location == WINTERHOLD {
 			materialWoodCount = 1
 			materialThreadCount = 2
 		}
@@ -104,12 +105,12 @@ func (local *Local) update() {
 		} else {
 			if maxValueAction == cutWoodValue {
 				local.markets[WOOD].ownedGoods++
-				if local.location == RIVERWOOD {
+				if specialized && local.location == RIVERWOOD {
 					local.markets[WOOD].ownedGoods++
 				}
 			} else if maxValueAction == spinThreadValue {
 				local.markets[THREAD].ownedGoods++
-				if local.location == PORTSVILLE {
+				if specialized && local.location == PORTSVILLE {
 					local.markets[THREAD].ownedGoods += 2
 				}
 			} else if maxValueAction == buildChairValue {

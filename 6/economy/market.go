@@ -15,6 +15,8 @@ const (
 	LEISURE Good = "leisure"
 )
 
+var goods = []Good{WOOD, CHAIR, THREAD, BED}
+
 type Market struct {
 	ownedGoods int
 

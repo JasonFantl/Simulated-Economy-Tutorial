@@ -1,21 +1,25 @@
 package economy
 
-import "fmt"
+import (
+	"fmt"
+	"math/rand"
+)
 
 var locals map[*Local]bool
 var merchants map[*Merchant]bool
+
+var specialized = false
 
 func Initialize(size int) {
 	locals = make(map[*Local]bool)
 	merchants = make(map[*Merchant]bool)
 
 	for i := 0; i < size; i++ {
-		locations := []Location{RIVERWOOD, SEASIDE, WINTERHOLD, PORTSVILLE}
 		locals[NewLocal(locations[i%len(locations)])] = true
 	}
-	// for i := 0; i < size/4; i++ {
-	// 	merchants[NewMerchant(RIVERWOOD, WOOD)] = true
-	// }
+	for i := 0; i < size/4; i++ {
+		merchants[NewMerchant(locations[rand.Intn(len(locations))], WOOD)] = true
+	}
 }
 
 var iteration = 0
@@ -33,22 +37,60 @@ func Update() {
 
 	iteration++
 
-	if iteration == 500 {
-		movingCosts[RIVERWOOD][SEASIDE] = 1
-		movingCosts[SEASIDE][RIVERWOOD] = 1
+	// taxing merchants
+	taxSums := make(map[Location]float64)
+	taxThreshold := 1000.0
+	taxPercent := 0.1
+	if iteration%10 == 0 {
+		for merchant := range merchants {
+			if merchant.money > taxThreshold {
+				tax := (merchant.money - taxThreshold) * taxPercent
+				merchant.money -= tax
+				taxSums[merchant.location] += tax
+			}
+		}
+	}
+	// now redistribute to the locals equally
+	localCount := make(map[Location]int)
+	for local := range locals {
+		localCount[local.location]++
+	}
+	for location, taxSum := range taxSums {
+		for local := range locals {
+			if local.location == location {
+				local.money += taxSum / float64(localCount[location])
+			}
+		}
+	}
 
-	}
-	if iteration == 1000 {
-		movingCosts[SEASIDE][WINTERHOLD] = 1
-		movingCosts[WINTERHOLD][SEASIDE] = 1
-	}
-	if iteration == 1500 {
-		movingCosts[WINTERHOLD][PORTSVILLE] = 1
-		movingCosts[PORTSVILLE][WINTERHOLD] = 1
+	// technology advances
+	if iteration == 500 {
+		specialized = true
 	}
 	if iteration == 2000 {
-		movingCosts[PORTSVILLE][RIVERWOOD] = 1
-		movingCosts[RIVERWOOD][PORTSVILLE] = 1
+		setTravelingCost(RIVERWOOD, SEASIDE, 0.5)
+		setTravelingCost(PORTSVILLE, WINTERHOLD, 0.5)
+	}
+	if iteration == 2500 {
+		setTravelingCost(RIVERWOOD, PORTSVILLE, 0.5)
+		setTravelingCost(SEASIDE, WINTERHOLD, 0.5)
+		setTravelingCost(RIVERWOOD, WINTERHOLD, 1)
+		setTravelingCost(SEASIDE, PORTSVILLE, 1)
+	}
+	if iteration == 3000 {
+		setTravelingCost(RIVERWOOD, SEASIDE, 100)
+		setTravelingCost(RIVERWOOD, PORTSVILLE, 100)
+		setTravelingCost(RIVERWOOD, WINTERHOLD, 100)
+		newLocals := make(map[*Local]bool)
+		for local := range locals {
+			if local.location != RIVERWOOD {
+				newLocals[local] = true
+			}
+		}
+		locals = newLocals
+	}
+	if iteration == 4000 {
+		specialized = false
 	}
 
 	updateGraph()
