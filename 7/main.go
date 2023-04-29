@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"math/rand"
+	"os"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -51,10 +52,10 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// economy.GraphGoodsVMoney(screen, "Thread V Money", economy.THREAD, 600, 600, 0.1, 2.0, 250, 10)
 	// economy.GraphGoodsVMoney(screen, "Bed V Money", economy.BED, 600, 800, 0.1, 20.0, 250, 1)
 
-	for _, city := range cities {
-		economy.GraphLeisureVWealth(screen, city, "Leisure V Wealth", 500, 800, 0.1, 10, 250, 2)
+	for i, city := range cities {
+		economy.GraphLeisureVWealth(screen, city, "Leisure V Wealth", 1000, 800, 0.1, 10, 250, 2)
 
-		economy.GraphMerchantType(screen, city, "Merchant types", 100, 800, 50, 5)
+		economy.GraphMerchantType(screen, city, "Merchant types", 200*(float64(i)+1), 800, 50, 5)
 	}
 }
 
@@ -70,10 +71,23 @@ func main() {
 	ebiten.SetWindowSize(1440, 940)
 	ebiten.SetWindowTitle("Economy Simulation")
 
-	cities = make([]economy.City, 4)
-	for i, name := range economy.Locations {
-		cities[i] = *economy.NewCity(name, 20)
+	arg := os.Args[1]
+
+	cities = make([]economy.City, 2)
+	if arg == "1" {
+		for i, name := range []string{"RIVERWOOD", "SEASIDE"} {
+			cities[i] = *economy.NewCity(name, 20)
+		}
+	} else {
+		for i, name := range []string{"WINTERHOLD", "PORTSVILLE"} {
+			cities[i] = *economy.NewCity(name, 20)
+		}
 	}
+
+	// add connections between cities
+	// economy.RegisterChanneledTravelWay(&cities[0], &cities[1])
+	// economy.RegisterChanneledTravelWay(&cities[1], &cities[0])
+
 	if err := ebiten.RunGame(game); err != nil {
 		panic(err)
 	}

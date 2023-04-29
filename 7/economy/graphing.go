@@ -171,12 +171,12 @@ func GraphGoodsVMoney(screen *ebiten.Image, city City, title string, good Good, 
 	}
 
 	for merchant := range city.merchants {
-		if good != merchant.buysSells {
+		if good != merchant.BuysSells {
 			continue
 		}
-		x := merchant.money
-		y := float64(merchant.owned)
-		r, g, b, _ := locationColors[merchant.location].RGBA()
+		x := merchant.Money
+		y := float64(merchant.Owned)
+		r, g, b, _ := locationColors[merchant.Location].RGBA()
 
 		points = append(points, dataPoint{
 			x:   x,
@@ -297,7 +297,7 @@ func GraphMerchantType(screen *ebiten.Image, city City, title string, drawXOff, 
 		points[good] = 0
 	}
 	for merchant := range city.merchants {
-		points[merchant.buysSells]++
+		points[merchant.BuysSells]++
 	}
 
 	// title

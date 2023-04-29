@@ -32,7 +32,7 @@ func NewLocal() *Local {
 	return local
 }
 
-func (local *Local) update(citiesAgents map[EconomicAgent]bool) {
+func (local *Local) update(city *City) {
 	// usually people don't try to buy or sell things
 	if rand.Float64() > 0.1 {
 		return
@@ -70,6 +70,9 @@ func (local *Local) update(citiesAgents map[EconomicAgent]bool) {
 	buildBedValue := 0.0
 	materialWoodCount := 2
 	materialThreadCount := 10
+	if city.name == "RIVERWOOD" {
+		materialThreadCount = 1
+	}
 	if local.markets[WOOD].ownedGoods > materialWoodCount && local.markets[THREAD].ownedGoods > materialThreadCount {
 		potentialBedValue := math.Max(local.potentialPersonalValue(BED), local.priceToValue(local.markets[BED].expectedMarketPrice))
 		materialValue := math.Max(local.currentPersonalValue(WOOD), local.priceToValue(local.markets[WOOD].expectedMarketPrice))*float64(materialWoodCount) +
@@ -99,7 +102,7 @@ func (local *Local) update(citiesAgents map[EconomicAgent]bool) {
 
 	for good := range local.markets {
 		if good != LEISURE {
-			local.updateMarket(good, citiesAgents)
+			local.updateMarket(good, city.allEconomicAgents())
 		}
 	}
 }
