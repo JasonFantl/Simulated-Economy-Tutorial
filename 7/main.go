@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"image/color"
 	"math/rand"
 	"os"
 	"time"
@@ -52,11 +53,10 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// economy.GraphGoodsVMoney(screen, "Thread V Money", economy.THREAD, 600, 600, 0.1, 2.0, 250, 10)
 	// economy.GraphGoodsVMoney(screen, "Bed V Money", economy.BED, 600, 800, 0.1, 20.0, 250, 1)
 
-	for i, city := range cities {
-		economy.GraphLeisureVWealth(screen, city, "Leisure V Wealth", 1000, 800, 0.1, 10, 250, 2)
-
-		economy.GraphMerchantType(screen, city, "Merchant types", 200*(float64(i)+1), 800, 50, 5)
+	for _, city := range cities {
+		economy.GraphLeisureVWealth(screen, city, "Leisure V Wealth", 600, 800, 0.1, 10, 250, 2)
 	}
+	economy.GraphMerchantType(screen, cities, "Merchant types", 200, 800, 50, 5)
 }
 
 // Layout determins the window size
@@ -64,29 +64,30 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 	return outsideWidth, outsideHeight
 }
 
+var locationColors = map[string]color.Color{
+	"RIVERWOOD":  color.RGBA{58, 158, 33, 100},
+	"SEASIDE":    color.RGBA{10, 159, 227, 100},
+	"WINTERHOLD": color.RGBA{255, 255, 255, 100},
+	"PORTSVILLE": color.RGBA{128, 0, 0, 100},
+}
+
 func main() {
 	rand.Seed(time.Now().Unix())
 	game := &Game{}
 
-	ebiten.SetWindowSize(1440, 940)
+	ebiten.SetWindowSize(1240, 940)
 	ebiten.SetWindowTitle("Economy Simulation")
 
-	arg := os.Args[1]
+	cityNames := os.Args[1:]
 
-	cities = make([]economy.City, 2)
-	if arg == "1" {
-		for i, name := range []string{"RIVERWOOD", "SEASIDE"} {
-			cities[i] = *economy.NewCity(name, 20)
-		}
-	} else {
-		for i, name := range []string{"WINTERHOLD", "PORTSVILLE"} {
-			cities[i] = *economy.NewCity(name, 20)
-		}
+	cities = make([]economy.City, len(cityNames))
+	for i, name := range cityNames {
+		cities[i] = *economy.NewCity(name, locationColors[name], 20)
 	}
 
 	// add connections between cities
-	// economy.RegisterChanneledTravelWay(&cities[0], &cities[1])
-	// economy.RegisterChanneledTravelWay(&cities[1], &cities[0])
+	economy.RegisterTravelWay(&cities[0], &cities[1])
+	economy.RegisterTravelWay(&cities[1], &cities[0])
 
 	if err := ebiten.RunGame(game); err != nil {
 		panic(err)

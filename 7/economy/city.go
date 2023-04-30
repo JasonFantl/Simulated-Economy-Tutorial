@@ -1,30 +1,42 @@
 package economy
 
-import "fmt"
+import (
+	"fmt"
+	"image/color"
+)
+
+// EconomicAgent is an interface that requires the minimum methods to interact in the economy
+type EconomicAgent interface {
+	isSelling(Good) (bool, float64)
+	transact(Good, bool, float64)
+	gossip(Good) float64
+}
 
 type cityName string
 
 // City separates economies from each other and managers all of its residents
 type City struct {
 	name      cityName
+	color     color.Color
 	locals    map[*Local]bool
 	merchants map[*Merchant]bool
 
-	inboundTravelWays  map[cityName]travelWayInbound  // currently only supports one travelWay per city
-	outboundTravelWays map[cityName]travelWayOutbound // currently only supports one travelWay per city
+	inboundTravelWays  map[cityName]*TravelWay // currently only supports one travelWay per city
+	outboundTravelWays map[cityName]*TravelWay // currently only supports one travelWay per city
 
-	networkPorts *NetworkedTravelWays
+	networkPorts *networkedTravelWays
 }
 
 // NewCity creates a city
-func NewCity(name string, size int) *City {
+func NewCity(name string, col color.Color, size int) *City {
 	city := &City{
 		name:      cityName(name),
+		color:     col,
 		locals:    make(map[*Local]bool),
 		merchants: make(map[*Merchant]bool),
 
-		inboundTravelWays:  make(map[cityName]travelWayInbound),
-		outboundTravelWays: make(map[cityName]travelWayOutbound),
+		inboundTravelWays:  make(map[cityName]*TravelWay),
+		outboundTravelWays: make(map[cityName]*TravelWay),
 	}
 
 	for i := 0; i < size; i++ {
@@ -34,7 +46,7 @@ func NewCity(name string, size int) *City {
 		city.merchants[NewMerchant(city, CHAIR)] = true
 	}
 
-	city.networkPorts = SetupNetworkedTravelWay(55555, city)
+	city.networkPorts = setupNetworkedTravelWay(55555, city)
 
 	return city
 }
@@ -72,14 +84,14 @@ func (city *City) Update() {
 
 	// TMP:: after some time connect one city to another
 	if len(previousDataPoints[WOOD][city.name]) == 2 && city.name == cityName("WINTERHOLD") {
-		city.networkPorts.RequestConnection("[::]:55555")
+		city.networkPorts.requestConnection("[::]:55555")
 	}
 	// TMP:: after some time connect one city to another
 	if len(previousDataPoints[WOOD][city.name]) == 200 && city.name == cityName("RIVERWOOD") {
-		city.networkPorts.RequestConnection("[::]:55557")
+		city.networkPorts.requestConnection("[::]:55557")
 	}
 
-	updateGraph(*city)
+	updateGraph(city)
 }
 
 func (city *City) allEconomicAgents() map[EconomicAgent]bool {
@@ -93,31 +105,29 @@ func (city *City) allEconomicAgents() map[EconomicAgent]bool {
 	return merged
 }
 
-func (city *City) addEnteringTravelWay(travelWay travelWayInbound) {
-	if travelWay.startCity() == city.name {
+func (city *City) addEnteringTravelWay(travelWay *TravelWay) {
+	if travelWay.city == city.name {
 		fmt.Printf("Cannot create inbound travelWay from a city to itself (%s)\n", city.name)
 		return
 	}
-	city.inboundTravelWays[travelWay.startCity()] = travelWay
+	city.inboundTravelWays[travelWay.city] = travelWay
 }
 
-func (city *City) addLeavingTravelWay(travelWay travelWayOutbound) {
-	if travelWay.endCity() == city.name {
+func (city *City) addLeavingTravelWay(travelWay *TravelWay) {
+	if travelWay.city == city.name {
 		fmt.Printf("Cannot create inbound travelWay from a city to itself (%s)\n", city.name)
 		return
 	}
-	city.outboundTravelWays[travelWay.endCity()] = travelWay
+	city.outboundTravelWays[travelWay.city] = travelWay
+}
+
+// CreateTravelWayToCity will make a unidirectional networked connection to another city over which merchants can travel
+func (city *City) CreateTravelWayToCity(address string) {
+	city.networkPorts.requestConnection(address)
 }
 
 // Influence will make some change to the city, hopefully allowing you to run experiments on the economy
 func Influence(location cityName, value float64) {
 	// do something to influence the economy
 
-	// if location == RIVERWOOD {
-	// 	movingCosts[RIVERWOOD][SEASIDE] *= (value+1)/2 + 0.5
-	// 	fmt.Printf("cost from Riverwood to Seaside now: %f\n", movingCosts[RIVERWOOD][SEASIDE])
-	// } else {
-	// 	movingCosts[SEASIDE][RIVERWOOD] *= (value+1)/2 + 0.5
-	// 	fmt.Printf("cost from Seaside to Riverwood now: %f\n", movingCosts[SEASIDE][RIVERWOOD])
-	// }
 }

@@ -127,7 +127,7 @@ func (merchant *Merchant) update(city *City) {
 	}
 }
 
-func (merchant *Merchant) leaveCity(city *City, travelWay travelWayOutbound) {
+func (merchant *Merchant) leaveCity(city *City, travelWay *TravelWay) {
 	// remove self from city
 	delete(city.merchants, merchant)
 	// enter travelWay

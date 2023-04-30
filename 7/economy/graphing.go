@@ -10,25 +10,18 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 )
 
-var locationColors = map[cityName]color.Color{
-	"RIVERWOOD":  color.RGBA{58, 158, 33, 100},
-	"SEASIDE":    color.RGBA{10, 159, 227, 100},
-	"WINTERHOLD": color.RGBA{255, 255, 255, 100},
-	"PORTSVILLE": color.RGBA{128, 0, 0, 100},
-}
-
 type dataPoint struct {
 	min, max float64
+	color    color.Color
 }
 
-var previousDataPoints map[Good]map[cityName][]*dataPoint = map[Good]map[cityName][]*dataPoint{}
+var previousDataPoints map[Good]map[cityName][]*dataPoint = make(map[Good]map[cityName][]*dataPoint)
 
-func updateGraph(city City) {
+func updateGraph(city *City) {
 
-	datapoints := make(map[cityName]map[Good]*dataPoint)
-	datapoints[city.name] = make(map[Good]*dataPoint)
+	datapoints := make(map[Good]*dataPoint)
 	for _, good := range goods {
-		datapoints[city.name][good] = &dataPoint{math.MaxFloat64, -math.MaxFloat64}
+		datapoints[good] = &dataPoint{math.MaxFloat64, -math.MaxFloat64, city.color}
 	}
 
 	for local := range city.locals {
@@ -36,28 +29,24 @@ func updateGraph(city City) {
 			if good == LEISURE {
 				continue
 			}
-			if market.expectedMarketPrice < datapoints[city.name][good].min {
-				datapoints[city.name][good].min = market.expectedMarketPrice
+			if market.expectedMarketPrice < datapoints[good].min {
+				datapoints[good].min = market.expectedMarketPrice
 			}
-			if market.expectedMarketPrice > datapoints[city.name][good].max {
-				datapoints[city.name][good].max = market.expectedMarketPrice
+			if market.expectedMarketPrice > datapoints[good].max {
+				datapoints[good].max = market.expectedMarketPrice
 			}
 		}
 	}
 
-	for location, goods := range datapoints {
-		for good, datapoint := range goods {
-			if _, ok := previousDataPoints[good]; !ok {
-				previousDataPoints[good] = make(map[cityName][]*dataPoint)
-			}
-			if _, ok := previousDataPoints[good][location]; !ok {
-				previousDataPoints[good][location] = make([]*dataPoint, 0)
-			}
-
-			previousDataPoints[good][location] = append(previousDataPoints[good][location], datapoint)
+	for good, datapoint := range datapoints {
+		if _, ok := previousDataPoints[good]; !ok {
+			previousDataPoints[good] = make(map[cityName][]*dataPoint)
 		}
+		if _, ok := previousDataPoints[good][city.name]; !ok {
+			previousDataPoints[good][city.name] = make([]*dataPoint, 0)
+		}
+		previousDataPoints[good][city.name] = append(previousDataPoints[good][city.name], datapoint)
 	}
-
 }
 
 // GraphExpectedValues will graph the expected values of a specific city
@@ -88,7 +77,6 @@ func GraphExpectedValues(screen *ebiten.Image, title string, good Good, drawXOff
 
 	// title
 	ebitenutil.DebugPrintAt(screen, title, int(drawXOff), int(drawYOff)+20)
-	ebitenutil.DebugPrintAt(screen, "(Green = Riverwood, Blue = Seaside, White=Winterhold, Red=Portsville)", int(drawXOff), int(drawYOff)+35)
 
 	// X axis
 	ebitenutil.DrawLine(screen, drawXOff, drawYOff, drawXOff+drawXZoom*float64(maxX-minX), drawYOff, color.White)
@@ -121,16 +109,12 @@ func GraphExpectedValues(screen *ebiten.Image, title string, good Good, drawXOff
 			datapoint := previousDataPoints[good][location][i]
 			x, y := drawXOff+drawXZoom*float64(i-minX), drawYOff-drawYZoom*(datapoint.min+datapoint.max)/2.0
 
-			col := locationColors[location]
-
 			w := 1.0
 			h := datapoint.max - datapoint.min
 			if h < 3 {
 				h = 3
 			}
-			ebitenutil.DrawRect(screen, x-w/2.0, y-h/2.0, w, h, col)
-
-			// ebitenutil.DrawLine(screen, x0, y0, x1, y1, col)
+			ebitenutil.DrawRect(screen, x-w/2.0, y-h/2.0, w, h, datapoint.color)
 		}
 	}
 }
@@ -150,11 +134,10 @@ func GraphGoodsVMoney(screen *ebiten.Image, city City, title string, good Good, 
 	for local := range city.locals {
 		x := local.money
 		y := float64(local.markets[good].ownedGoods)
-		col := locationColors[city.name]
 		points = append(points, dataPoint{
 			x:   x,
 			y:   y,
-			col: col,
+			col: city.color,
 		})
 		if x < minX {
 			minX = x
@@ -176,7 +159,7 @@ func GraphGoodsVMoney(screen *ebiten.Image, city City, title string, good Good, 
 		}
 		x := merchant.Money
 		y := float64(merchant.Owned)
-		r, g, b, _ := locationColors[merchant.Location].RGBA()
+		r, g, b, _ := city.color.RGBA()
 
 		points = append(points, dataPoint{
 			x:   x,
@@ -199,7 +182,6 @@ func GraphGoodsVMoney(screen *ebiten.Image, city City, title string, good Good, 
 
 	// title
 	ebitenutil.DebugPrintAt(screen, title, int(drawXOff), int(drawYOff)+20)
-	ebitenutil.DebugPrintAt(screen, "(Green = Riverwood, Blue = Seaside)", int(drawXOff), int(drawYOff)+35)
 
 	// X axis
 	ebitenutil.DrawLine(screen, drawXOff, drawYOff, drawXOff+drawXZoom*float64(maxX-minX), drawYOff, color.White)
@@ -242,12 +224,11 @@ func GraphLeisureVWealth(screen *ebiten.Image, city City, title string, drawXOff
 		// 	x += market.expectedMarketPrice * float64(market.ownedGoods)
 		// }
 		y := float64(local.markets[LEISURE].basePersonalValue)
-		col := locationColors[city.name]
 
 		points = append(points, dataPoint{
 			x:   x,
 			y:   y,
-			col: col,
+			col: city.color,
 		})
 		if x < minX {
 			minX = x
@@ -290,14 +271,22 @@ func GraphLeisureVWealth(screen *ebiten.Image, city City, title string, drawXOff
 }
 
 // GraphMerchantType will graph the number of all the different merchant types
-func GraphMerchantType(screen *ebiten.Image, city City, title string, drawXOff, drawYOff, drawXZoom, drawYZoom float64) {
+func GraphMerchantType(screen *ebiten.Image, cities []City, title string, drawXOff, drawYOff, drawXZoom, drawYZoom float64) {
 
-	points := make(map[Good]int)
+	points := make(map[Good]map[cityName]int)
+	totals := make(map[Good]int)
+
 	for _, good := range goods {
-		points[good] = 0
+		points[good] = make(map[cityName]int)
+		for _, city := range cities {
+			points[good][city.name] = 0
+		}
 	}
-	for merchant := range city.merchants {
-		points[merchant.BuysSells]++
+	for _, city := range cities {
+		for merchant := range city.merchants {
+			points[merchant.BuysSells][city.name]++
+			totals[merchant.BuysSells]++
+		}
 	}
 
 	// title
@@ -306,15 +295,19 @@ func GraphMerchantType(screen *ebiten.Image, city City, title string, drawXOff, 
 	// 2d plot
 	xIndex := 0.0
 	for _, good := range goods {
+		yOff := 0.0
 		x := drawXOff + drawXZoom*xIndex
-		y := drawYOff
 		w := drawXZoom * 0.9
-		h := float64(points[good]) * drawYZoom
+		for _, city := range cities {
+			y := drawYOff + yOff
+			h := float64(points[good][city.name]) * drawYZoom
 
-		ebitenutil.DrawRect(screen, x, y-h, w, h, color.RGBA{100, 100, 100, 255})
-		ebitenutil.DebugPrintAt(screen, string(good), int(x), int(y)+20)
-		ebitenutil.DebugPrintAt(screen, strconv.Itoa(points[good]), int(x), int(y)+40)
+			ebitenutil.DrawRect(screen, x, y-h, w, h, city.color)
 
+			yOff -= h
+		}
+		ebitenutil.DebugPrintAt(screen, string(good), int(x), int(drawYOff)+20)
+		ebitenutil.DebugPrintAt(screen, strconv.Itoa(totals[good]), int(x), int(drawYOff)+40)
 		xIndex++
 	}
 }

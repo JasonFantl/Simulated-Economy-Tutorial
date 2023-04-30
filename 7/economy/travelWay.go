@@ -13,44 +13,26 @@ import (
 	"syscall"
 )
 
-type travelWayInbound interface {
-	startCity() cityName
-	receiveImmigrant() (bool, *Merchant)
-}
-
-type travelWayOutbound interface {
-	endCity() cityName
-	sendEmigrant(*Merchant)
-}
-
-// can be used as either an entering or leaving travelWay
-type channeledTravelWay struct {
+// TravelWay can be used as either an entering or leaving travelWay
+type TravelWay struct {
 	city    cityName
 	channel chan *Merchant
 }
 
-// RegisterChanneledTravelWay connects cities between threads
-func RegisterChanneledTravelWay(fromCity *City, toCity *City) {
+// RegisterTravelWay connects cities using channels
+func RegisterTravelWay(fromCity *City, toCity *City) {
 	channel := make(chan *Merchant, 100)
-	toCity.addEnteringTravelWay(&channeledTravelWay{
+	toCity.addEnteringTravelWay(&TravelWay{
 		city:    fromCity.name,
 		channel: channel,
 	})
-	fromCity.addLeavingTravelWay(&channeledTravelWay{
+	fromCity.addLeavingTravelWay(&TravelWay{
 		city:    toCity.name,
 		channel: channel,
 	})
 }
 
-func (travelWay *channeledTravelWay) endCity() cityName {
-	return travelWay.city
-}
-
-func (travelWay *channeledTravelWay) startCity() cityName {
-	return travelWay.city
-}
-
-func (travelWay *channeledTravelWay) receiveImmigrant() (bool, *Merchant) {
+func (travelWay *TravelWay) receiveImmigrant() (bool, *Merchant) {
 	select {
 	case merchant := <-travelWay.channel:
 		return true, merchant
@@ -60,17 +42,17 @@ func (travelWay *channeledTravelWay) receiveImmigrant() (bool, *Merchant) {
 }
 
 // have to be careful, if the receiving city is not popping off merchants, this can become blocking
-func (travelWay *channeledTravelWay) sendEmigrant(merchant *Merchant) {
+func (travelWay *TravelWay) sendEmigrant(merchant *Merchant) {
 	travelWay.channel <- merchant
 }
 
-type NetworkedTravelWays struct {
+type networkedTravelWays struct {
 	city *City
 }
 
-// SetupNetworkedTravelWay will listen for incoming connections and add them to the cities travelWays. It can also connect to another networkTravelWay
-func SetupNetworkedTravelWay(portNumber int, city *City) *NetworkedTravelWays {
-	travelWays := &NetworkedTravelWays{
+// setupNetworkedTravelWay will listen for incoming connections and add them to the cities travelWays. It can also connect to another networkTravelWay
+func setupNetworkedTravelWay(portNumber int, city *City) *networkedTravelWays {
+	travelWays := &networkedTravelWays{
 		city: city,
 	}
 
@@ -103,7 +85,7 @@ func SetupNetworkedTravelWay(portNumber int, city *City) *NetworkedTravelWays {
 	return travelWays
 }
 
-func (travelWays *NetworkedTravelWays) RequestConnection(address string) {
+func (travelWays *networkedTravelWays) requestConnection(address string) {
 	fmt.Printf("Requesting connection: %s...\n", address)
 
 	connection, err := net.Dial("tcp", address)
@@ -116,7 +98,7 @@ func (travelWays *NetworkedTravelWays) RequestConnection(address string) {
 }
 
 // blocking, must be handled as a new routine
-func (travelWays *NetworkedTravelWays) handleIncomingConnection(connection net.Conn) {
+func (travelWays *networkedTravelWays) handleIncomingConnection(connection net.Conn) {
 	defer connection.Close()
 
 	// get the incoming city's name
@@ -137,7 +119,7 @@ func (travelWays *NetworkedTravelWays) handleIncomingConnection(connection net.C
 
 	// add travelWay to city
 	channel := make(chan *Merchant, 100)
-	travelWays.city.addEnteringTravelWay(&channeledTravelWay{
+	travelWays.city.addEnteringTravelWay(&TravelWay{
 		city:    remoteCityName,
 		channel: channel,
 	})
@@ -172,7 +154,7 @@ func (travelWays *NetworkedTravelWays) handleIncomingConnection(connection net.C
 }
 
 // blocking, must be handled as a new routine
-func (travelWays *NetworkedTravelWays) handleOutgoingConnection(connection net.Conn) {
+func (travelWays *networkedTravelWays) handleOutgoingConnection(connection net.Conn) {
 	defer connection.Close()
 
 	// send our city's name
@@ -193,7 +175,7 @@ func (travelWays *NetworkedTravelWays) handleOutgoingConnection(connection net.C
 
 	// add travelWay to city
 	channel := make(chan *Merchant, 100)
-	travelWays.city.addLeavingTravelWay(&channeledTravelWay{
+	travelWays.city.addLeavingTravelWay(&TravelWay{
 		city:    remoteCityName,
 		channel: channel,
 	})
