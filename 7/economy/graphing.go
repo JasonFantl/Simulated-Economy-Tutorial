@@ -271,7 +271,7 @@ func GraphLeisureVWealth(screen *ebiten.Image, city City, title string, drawXOff
 }
 
 // GraphMerchantType will graph the number of all the different merchant types
-func GraphMerchantType(screen *ebiten.Image, cities []City, title string, drawXOff, drawYOff, drawXZoom, drawYZoom float64) {
+func GraphMerchantType(screen *ebiten.Image, cities []*City, title string, drawXOff, drawYOff, drawXZoom, drawYZoom float64) {
 
 	points := make(map[Good]map[cityName]int)
 	totals := make(map[Good]int)

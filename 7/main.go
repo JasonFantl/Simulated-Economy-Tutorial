@@ -18,7 +18,7 @@ type Game struct {
 
 var previousTime time.Time
 
-var cities []economy.City
+var cities []*economy.City
 
 // Update will be called at 60 FPS
 func (g *Game) Update() error {
@@ -54,7 +54,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// economy.GraphGoodsVMoney(screen, "Bed V Money", economy.BED, 600, 800, 0.1, 20.0, 250, 1)
 
 	for _, city := range cities {
-		economy.GraphLeisureVWealth(screen, city, "Leisure V Wealth", 600, 800, 0.1, 10, 250, 2)
+		economy.GraphLeisureVWealth(screen, *city, "Leisure V Wealth", 600, 800, 0.1, 10, 250, 2)
 	}
 	economy.GraphMerchantType(screen, cities, "Merchant types", 200, 800, 50, 5)
 }
@@ -80,14 +80,14 @@ func main() {
 
 	cityNames := os.Args[1:]
 
-	cities = make([]economy.City, len(cityNames))
+	cities = make([]*economy.City, len(cityNames))
 	for i, name := range cityNames {
-		cities[i] = *economy.NewCity(name, locationColors[name], 20)
+		cities[i] = economy.NewCity(name, locationColors[name], 20)
 	}
 
 	// add connections between cities
-	economy.RegisterTravelWay(&cities[0], &cities[1])
-	economy.RegisterTravelWay(&cities[1], &cities[0])
+	economy.RegisterTravelWay(cities[0], cities[1])
+	economy.RegisterTravelWay(cities[1], cities[0])
 
 	if err := ebiten.RunGame(game); err != nil {
 		panic(err)

@@ -14,15 +14,16 @@ type EconomicAgent interface {
 
 type cityName string
 
-// City separates economies from each other and managers all of its residents
+// City separates economies from each other and manages all of its residents
 type City struct {
-	name      cityName
-	color     color.Color
+	name  cityName
+	color color.Color
+
 	locals    map[*Local]bool
 	merchants map[*Merchant]bool
 
-	inboundTravelWays  map[cityName]*TravelWay // currently only supports one travelWay per city
-	outboundTravelWays map[cityName]*TravelWay // currently only supports one travelWay per city
+	inboundTravelWays  map[cityName]*TravelWay
+	outboundTravelWays map[cityName]*TravelWay
 
 	networkPorts *networkedTravelWays
 }
@@ -60,7 +61,7 @@ func (city *City) Update() {
 		for _, travelWay := range city.inboundTravelWays {
 			if existNewMerchant, newMerchant := travelWay.receiveImmigrant(); existNewMerchant {
 				city.merchants[newMerchant] = true
-				newMerchant.Location = city.name
+				newMerchant.Location = city.name // let the merchant know they arrived
 
 				// if the merchant is rich, tax them and distribute amongst the locals
 				if newMerchant.Money > 1000.0 {

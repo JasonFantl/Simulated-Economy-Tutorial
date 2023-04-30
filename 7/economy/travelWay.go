@@ -33,7 +33,7 @@ func RegisterTravelWay(fromCity *City, toCity *City) {
 }
 
 func (travelWay *TravelWay) receiveImmigrant() (bool, *Merchant) {
-	select {
+	select { // makes this non-blocking
 	case merchant := <-travelWay.channel:
 		return true, merchant
 	default:
@@ -41,7 +41,7 @@ func (travelWay *TravelWay) receiveImmigrant() (bool, *Merchant) {
 	}
 }
 
-// have to be careful, if the receiving city is not popping off merchants, this can become blocking
+// have to be careful, if the receiving city is not receiving merchants, this can become blocking
 func (travelWay *TravelWay) sendEmigrant(merchant *Merchant) {
 	travelWay.channel <- merchant
 }
@@ -101,7 +101,7 @@ func (travelWays *networkedTravelWays) requestConnection(address string) {
 func (travelWays *networkedTravelWays) handleIncomingConnection(connection net.Conn) {
 	defer connection.Close()
 
-	// get the incoming city's name
+	// receive the other city's name
 	remoteCityNameBytes := make([]byte, 1024)
 	n, err := connection.Read(remoteCityNameBytes)
 	if err != nil {
@@ -110,7 +110,7 @@ func (travelWays *networkedTravelWays) handleIncomingConnection(connection net.C
 	}
 	remoteCityName := cityName(remoteCityNameBytes[:n])
 
-	// send our city's name in response
+	// send our city's name
 	_, err = connection.Write([]byte(travelWays.city.name))
 	if err != nil {
 		fmt.Println(err)
@@ -126,17 +126,13 @@ func (travelWays *networkedTravelWays) handleIncomingConnection(connection net.C
 
 	fmt.Printf("Successfully added city %s as a network connection, accepting merchants...\n", remoteCityName)
 
-	// listen for incoming merchants and pass them into the travelWay
+	// pass merchants from connection to channel
 	reader := bufio.NewReader(connection)
 	for {
 		line, err := reader.ReadString('\n')
 		if err != nil {
-			if err != io.EOF {
+			if err != io.EOF && err != syscall.EPIPE {
 				fmt.Println(err)
-			} else {
-				// connection broken
-				// WARNING: this is accessing a map in another routine, may not be thread safe
-				delete(travelWays.city.inboundTravelWays, remoteCityName)
 			}
 			break
 		}
@@ -151,6 +147,9 @@ func (travelWays *networkedTravelWays) handleIncomingConnection(connection net.C
 
 		channel <- merchant
 	}
+
+	fmt.Printf("Connection with %s broken, removing travelWay\n", remoteCityName)
+	delete(travelWays.city.inboundTravelWays, remoteCityName)
 }
 
 // blocking, must be handled as a new routine
