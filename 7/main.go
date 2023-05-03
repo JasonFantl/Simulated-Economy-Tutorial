@@ -48,15 +48,15 @@ func (g *Game) Update() error {
 
 // Draw is called after Update to display to the screen
 func (g *Game) Draw(screen *ebiten.Image) {
-	economy.GraphExpectedValues(screen, "Price of Wood", economy.WOOD, 100, 300, 0.5, 40.0, 800, 100, 1)
-	economy.GraphExpectedValues(screen, "Price of Chairs", economy.CHAIR, 100, 600, 0.5, 8.0, 800, 100, 5)
-	economy.GraphExpectedValues(screen, "Price of Thread", economy.THREAD, 600, 300, 0.5, 30.0, 800, 100, 1)
-	economy.GraphExpectedValues(screen, "Price of Bed", economy.BED, 600, 600, 0.5, 4.0, 800, 100, 10)
+	economy.GraphExpectedValues(screen, "Price of Wood", economy.WOOD, 100, 200, 0.2, 20.0, 800, 200, 1)
+	economy.GraphExpectedValues(screen, "Price of Chairs", economy.CHAIR, 100, 400, 0.2, 4.0, 800, 200, 5)
+	economy.GraphExpectedValues(screen, "Price of Thread", economy.THREAD, 350, 200, 0.2, 20.0, 800, 200, 1)
+	economy.GraphExpectedValues(screen, "Price of Bed", economy.BED, 350, 400, 0.2, 2.0, 800, 200, 10)
 
+	economy.GraphMerchantType(screen, cities, "Merchant types", 80, 600, 40, 5)
 	for _, city := range cities {
-		economy.GraphLeisureVWealth(screen, *city, "Leisure V Wealth", 600, 800, 0.1, 10, 250, 2)
+		economy.GraphLeisureVWealth(screen, *city, "Leisure V Wealth", 300, 600, 0.1, 10, 250, 2)
 	}
-	economy.GraphMerchantType(screen, cities, "Merchant types", 200, 800, 50, 5)
 }
 
 // Layout determins the window size
@@ -75,14 +75,15 @@ func main() {
 	rand.Seed(time.Now().Unix())
 	game := &Game{}
 
-	ebiten.SetWindowSize(1240, 940)
+	ebiten.SetWindowSize(650, 750)
 	ebiten.SetWindowTitle("Economy Simulation")
 
 	cityNames := os.Args[1:]
 
 	cities = make([]*economy.City, len(cityNames))
 	for i, name := range cityNames {
-		if col, ok := locationColors[strings.ToUpper(name)]; ok {
+		name = strings.ToUpper(name)
+		if col, ok := locationColors[name]; ok {
 			cities[i] = economy.NewCity(name, col, 20)
 		} else {
 			fmt.Println("Currently only support cities: " + strings.Join(maps.Keys(locationColors), ", "))

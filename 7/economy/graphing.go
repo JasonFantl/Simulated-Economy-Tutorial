@@ -109,7 +109,7 @@ func GraphExpectedValues(screen *ebiten.Image, title string, good Good, drawXOff
 			datapoint := previousDataPoints[good][location][i]
 			x, y := drawXOff+drawXZoom*float64(i-minX), drawYOff-drawYZoom*(datapoint.min+datapoint.max)/2.0
 
-			w := 1.0
+			w := 0.4
 			h := datapoint.max - datapoint.min
 			if h < 3 {
 				h = 3
