@@ -9,18 +9,20 @@ import (
 // As annoying as it is, the JSON package needs access to the fields of Merchant, which it can only do if they are public
 type Merchant struct {
 	Money            float64
-	Location         cityName
+	city             cityName
 	BuysSells        Good
 	CarryingCapacity int
 	Owned            int
 	ExpectedPrices   map[Good]map[cityName]float64 // merchants use this instead of the value in the market
+
+	bestSellLocation cityName //
 }
 
 // NewMerchant creates a merchant
 func NewMerchant(city *City, good Good) *Merchant {
 	merchant := &Merchant{
 		Money:            1000,
-		Location:         city.name,
+		city:             city.name,
 		BuysSells:        good,
 		CarryingCapacity: 20,
 		Owned:            0,
@@ -38,6 +40,7 @@ func NewMerchant(city *City, good Good) *Merchant {
 }
 
 func (merchant *Merchant) update(city *City) {
+
 	// usually people don't try to buy or sell things
 	if rand.Float64() > 0.1 {
 		return
@@ -51,11 +54,11 @@ func (merchant *Merchant) update(city *City) {
 	}
 
 	// look to buy
-	willingBuyPrice := merchant.ExpectedPrices[merchant.BuysSells][merchant.Location]
-	_, bestSellLocation, _ := merchant.bestDeal(merchant.BuysSells)
-	bestSellPrice := merchant.ExpectedPrices[merchant.BuysSells][bestSellLocation]
+	willingBuyPrice := merchant.ExpectedPrices[merchant.BuysSells][merchant.city]
+	merchant.bestSellLocation, _ = merchant.bestDeal(merchant.BuysSells, city)
+	bestSellPrice := merchant.ExpectedPrices[merchant.BuysSells][merchant.bestSellLocation]
 
-	if bestSellLocation != merchant.Location && merchant.Owned < merchant.CarryingCapacity { // no possible profit by buying and selling in same location
+	if merchant.bestSellLocation != merchant.city && merchant.Owned < merchant.CarryingCapacity { // no possible profit by buying and selling in same location
 		// try and find someone to buy from
 		for otherAgent := range city.locals {
 			isSeller, sellingPrice := otherAgent.isSelling(merchant.BuysSells)
@@ -81,58 +84,48 @@ func (merchant *Merchant) update(city *City) {
 	// randomly move cities
 	if rand.Intn(100) == 0 {
 
-		for _, travelWay := range city.outboundTravelWays {
-			merchant.leaveCity(city, travelWay)
+		for connectedCity := range city.outboundTravelWays {
+			merchant.leaveCity(city, connectedCity)
 			return
 		}
 	}
 
 	// change cities once we bought our good in bulk
-	if merchant.Owned >= merchant.CarryingCapacity && merchant.Location != bestSellLocation {
+	if merchant.Owned >= merchant.CarryingCapacity && merchant.city != merchant.bestSellLocation {
 		// make sure we have a path there, if not, randomly move (smarter merchants could potentially do path finding, Q learning?)
-		if travelWay, ok := city.outboundTravelWays[bestSellLocation]; ok {
-			merchant.leaveCity(city, travelWay)
+		if _, ok := city.outboundTravelWays[merchant.bestSellLocation]; ok {
+			merchant.leaveCity(city, merchant.bestSellLocation)
 			return
 		} else if len(city.outboundTravelWays) > 0 {
 			// get random travelWay by using first in iteration
-			for _, randomTravelWay := range city.outboundTravelWays {
-				merchant.leaveCity(city, randomTravelWay)
+			for randomCity := range city.outboundTravelWays {
+				merchant.leaveCity(city, randomCity)
 				return
 			}
 		}
 	}
 
-	// for good, cityPrices := range merchant.expectedPrices {
-	// 	for city, price := range cityPrices {
-	// 		fmt.Printf("merchant expected cost of %s in %s is %f\n", good, city, price)
-	// 	}
-	// }
-
 	// consider switching professions if we aren't selling right now
 	if merchant.Owned == 0 {
-		// bestBuyLoc, bestSellLoc := merchant.location, merchant.location
 		bestGood, bestProfit := BED, 0.0
 		for good := range merchant.ExpectedPrices {
-			_, _, potentialProfit := merchant.bestDeal(good)
+			_, potentialProfit := merchant.bestDeal(good, city)
 			if potentialProfit > bestProfit {
 				bestProfit = potentialProfit
 				bestGood = good
-				// bestBuyLoc = bbl
-				// bestSellLoc = bsl
 			}
 		}
-		// fmt.Printf("Best good to sell as merchant is %s from %s to %s\n", bestGood, bestBuyLoc, bestSellLoc)
 
 		merchant.BuysSells = bestGood
 	}
 }
 
-func (merchant *Merchant) leaveCity(city *City, travelWay *TravelWay) {
+func (merchant *Merchant) leaveCity(city *City, toCity cityName) {
 	// remove self from city
 	delete(city.merchants, merchant)
 	// enter travelWay
-	merchant.Location = "traveling..."
-	travelWay.sendEmigrant(merchant)
+	merchant.city = "traveling..." // not necessary, gets ignored by JSON serializer
+	city.outboundTravelWays[toCity] <- merchant
 }
 
 func (merchant *Merchant) isSelling(good Good) (bool, float64) {
@@ -140,11 +133,9 @@ func (merchant *Merchant) isSelling(good Good) (bool, float64) {
 		return false, 0
 	}
 
-	_, bestSellLocation, _ := merchant.bestDeal(merchant.BuysSells)
-
 	// only sell if we are in the best place to sell, and only sell for the market price
-	if merchant.Location == bestSellLocation {
-		return true, merchant.ExpectedPrices[good][bestSellLocation]
+	if merchant.city == merchant.bestSellLocation {
+		return true, merchant.ExpectedPrices[good][merchant.bestSellLocation]
 	}
 	return false, 0
 }
@@ -164,30 +155,34 @@ func (merchant *Merchant) transact(good Good, buying bool, price float64) {
 }
 
 func (merchant *Merchant) gossip(good Good) float64 {
-	return merchant.ExpectedPrices[good][merchant.Location]
+	return merchant.ExpectedPrices[good][merchant.city]
 }
 
 // find the best location to travel to and how much you would make selling a good there minus the travel expense.
 // returns buy location, sell location, expected sell price
-func (merchant *Merchant) bestDeal(good Good) (cityName, cityName, float64) {
+func (merchant *Merchant) bestDeal(good Good, city *City) (cityName, float64) {
 
-	// considers all cities, even if we get disconnected from them. Later, merchants can be more intelligent
-	bestBuyLocation := merchant.Location
-	bestSellLocation := merchant.Location
+	// considers nearby (connected) cities. Later, merchants can be more intelligent
+	bestSellLocation := merchant.city
 	bestProfit := 0.0
-	for buyLocation, buyPrice := range merchant.ExpectedPrices[good] {
-		for sellLocation, sellPrice := range merchant.ExpectedPrices[good] {
+	possibleCities := []cityName{merchant.city}
+	for name := range city.outboundTravelWays {
+		possibleCities = append(possibleCities, name)
+	}
+	for _, buyLocation := range possibleCities {
+		buyPrice := merchant.ExpectedPrices[good][buyLocation]
+		for _, sellLocation := range possibleCities {
+			sellPrice := merchant.ExpectedPrices[good][sellLocation]
 			// get moving costs, pretend it's 1 for now
 			movingCost := 1.0
 
 			potentialProfit := sellPrice - (buyPrice + movingCost)
 			if potentialProfit > bestProfit {
-				bestBuyLocation = buyLocation
 				bestSellLocation = sellLocation
 				bestProfit = potentialProfit
 			}
 		}
 	}
 
-	return bestBuyLocation, bestSellLocation, bestProfit
+	return bestSellLocation, bestProfit
 }

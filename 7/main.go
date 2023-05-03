@@ -2,14 +2,17 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"image/color"
 	"math/rand"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/jasonfantl/SimulatedEconomy7/economy"
+	"golang.org/x/exp/maps"
 )
 
 // Game is required by ebiten
@@ -35,6 +38,8 @@ func (g *Game) Update() error {
 	for _, p := range inpututil.AppendPressedKeys(make([]ebiten.Key, 1)) {
 		if p == ebiten.KeyEscape {
 			return errors.New("user quit")
+		} else if p == ebiten.KeyAlt && inpututil.IsKeyJustPressed(p) {
+			cities[0].CreateTravelWayToCity("127.0.0.1:55555")
 		}
 	}
 
@@ -47,11 +52,6 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	economy.GraphExpectedValues(screen, "Price of Chairs", economy.CHAIR, 100, 600, 0.5, 8.0, 800, 100, 5)
 	economy.GraphExpectedValues(screen, "Price of Thread", economy.THREAD, 600, 300, 0.5, 30.0, 800, 100, 1)
 	economy.GraphExpectedValues(screen, "Price of Bed", economy.BED, 600, 600, 0.5, 4.0, 800, 100, 10)
-
-	// economy.GraphGoodsVMoney(screen, "Wood V Money", economy.WOOD, 600, 200, 0.1, 4.0, 250, 10)
-	// economy.GraphGoodsVMoney(screen, "Chair V Money", economy.CHAIR, 600, 400, 0.1, 4.0, 250, 10)
-	// economy.GraphGoodsVMoney(screen, "Thread V Money", economy.THREAD, 600, 600, 0.1, 2.0, 250, 10)
-	// economy.GraphGoodsVMoney(screen, "Bed V Money", economy.BED, 600, 800, 0.1, 20.0, 250, 1)
 
 	for _, city := range cities {
 		economy.GraphLeisureVWealth(screen, *city, "Leisure V Wealth", 600, 800, 0.1, 10, 250, 2)
@@ -82,7 +82,11 @@ func main() {
 
 	cities = make([]*economy.City, len(cityNames))
 	for i, name := range cityNames {
-		cities[i] = economy.NewCity(name, locationColors[name], 20)
+		if col, ok := locationColors[strings.ToUpper(name)]; ok {
+			cities[i] = economy.NewCity(name, col, 20)
+		} else {
+			fmt.Println("Currently only support cities: " + strings.Join(maps.Keys(locationColors), ", "))
+		}
 	}
 
 	// add connections between cities

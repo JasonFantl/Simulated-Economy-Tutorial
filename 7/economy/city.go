@@ -1,7 +1,6 @@
 package economy
 
 import (
-	"fmt"
 	"image/color"
 )
 
@@ -22,8 +21,8 @@ type City struct {
 	locals    map[*Local]bool
 	merchants map[*Merchant]bool
 
-	inboundTravelWays  map[cityName]*TravelWay
-	outboundTravelWays map[cityName]*TravelWay
+	inboundTravelWays  map[cityName]chan *Merchant
+	outboundTravelWays map[cityName]chan *Merchant
 
 	networkPorts *networkedTravelWays
 }
@@ -36,14 +35,14 @@ func NewCity(name string, col color.Color, size int) *City {
 		locals:    make(map[*Local]bool),
 		merchants: make(map[*Merchant]bool),
 
-		inboundTravelWays:  make(map[cityName]*TravelWay),
-		outboundTravelWays: make(map[cityName]*TravelWay),
+		inboundTravelWays:  make(map[cityName]chan *Merchant),
+		outboundTravelWays: make(map[cityName]chan *Merchant),
 	}
 
 	for i := 0; i < size; i++ {
 		city.locals[NewLocal()] = true
 	}
-	for i := 0; i < size/4; i++ {
+	for i := 0; i < size/2; i++ {
 		city.merchants[NewMerchant(city, CHAIR)] = true
 	}
 
@@ -58,10 +57,10 @@ func (city *City) Update() {
 	// speed up the simulation
 	for i := 0; i < 100; i++ {
 		// check for new merchants
-		for _, travelWay := range city.inboundTravelWays {
-			if existNewMerchant, newMerchant := travelWay.receiveImmigrant(); existNewMerchant {
+		for _, channel := range city.inboundTravelWays {
+			if existNewMerchant, newMerchant := city.receiveImmigrant(channel); existNewMerchant {
 				city.merchants[newMerchant] = true
-				newMerchant.Location = city.name // let the merchant know they arrived
+				newMerchant.city = city.name // let the merchant know they arrived
 
 				// if the merchant is rich, tax them and distribute amongst the locals
 				if newMerchant.Money > 1000.0 {
@@ -83,15 +82,6 @@ func (city *City) Update() {
 		}
 	}
 
-	// TMP:: after some time connect one city to another
-	if len(previousDataPoints[WOOD][city.name]) == 2 && city.name == cityName("WINTERHOLD") {
-		city.networkPorts.requestConnection("[::]:55555")
-	}
-	// TMP:: after some time connect one city to another
-	if len(previousDataPoints[WOOD][city.name]) == 200 && city.name == cityName("RIVERWOOD") {
-		city.networkPorts.requestConnection("[::]:55557")
-	}
-
 	updateGraph(city)
 }
 
@@ -106,25 +96,18 @@ func (city *City) allEconomicAgents() map[EconomicAgent]bool {
 	return merged
 }
 
-func (city *City) addEnteringTravelWay(travelWay *TravelWay) {
-	if travelWay.city == city.name {
-		fmt.Printf("Cannot create inbound travelWay from a city to itself (%s)\n", city.name)
-		return
+func (city *City) receiveImmigrant(channel chan *Merchant) (bool, *Merchant) {
+	select { // makes this non-blocking
+	case merchant := <-channel:
+		return true, merchant
+	default:
+		return false, nil
 	}
-	city.inboundTravelWays[travelWay.city] = travelWay
 }
 
-func (city *City) addLeavingTravelWay(travelWay *TravelWay) {
-	if travelWay.city == city.name {
-		fmt.Printf("Cannot create inbound travelWay from a city to itself (%s)\n", city.name)
-		return
-	}
-	city.outboundTravelWays[travelWay.city] = travelWay
-}
-
-// CreateTravelWayToCity will make a unidirectional networked connection to another city over which merchants can travel
+// CreateTravelWayToCity will make a bidirectional networked connection to another city over which merchants can travel
 func (city *City) CreateTravelWayToCity(address string) {
-	city.networkPorts.requestConnection(address)
+	city.networkPorts.requestConnection(address, BIDIRECTIONAL)
 }
 
 // Influence will make some change to the city, hopefully allowing you to run experiments on the economy

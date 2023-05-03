@@ -10,61 +10,46 @@ import (
 	"os"
 	"runtime"
 	"strconv"
+	"strings"
 	"syscall"
 )
-
-// TravelWay can be used as either an entering or leaving travelWay
-type TravelWay struct {
-	city    cityName
-	channel chan *Merchant
-}
 
 // RegisterTravelWay connects cities using channels
 func RegisterTravelWay(fromCity *City, toCity *City) {
 	channel := make(chan *Merchant, 100)
-	toCity.addEnteringTravelWay(&TravelWay{
-		city:    fromCity.name,
-		channel: channel,
-	})
-	fromCity.addLeavingTravelWay(&TravelWay{
-		city:    toCity.name,
-		channel: channel,
-	})
-}
-
-func (travelWay *TravelWay) receiveImmigrant() (bool, *Merchant) {
-	select { // makes this non-blocking
-	case merchant := <-travelWay.channel:
-		return true, merchant
-	default:
-		return false, nil
-	}
-}
-
-// have to be careful, if the receiving city is not receiving merchants, this can become blocking
-func (travelWay *TravelWay) sendEmigrant(merchant *Merchant) {
-	travelWay.channel <- merchant
+	toCity.inboundTravelWays[fromCity.name] = channel
+	fromCity.outboundTravelWays[toCity.name] = channel
 }
 
 type networkedTravelWays struct {
-	city *City
+	city   *City
+	server net.Listener
 }
+
+type TravelWayProtocolType string
+
+const (
+	UNIDIRECTIONAL TravelWayProtocolType = "unidirectional"
+	BIDIRECTIONAL  TravelWayProtocolType = "bidirectional"
+)
 
 // setupNetworkedTravelWay will listen for incoming connections and add them to the cities travelWays. It can also connect to another networkTravelWay
 func setupNetworkedTravelWay(portNumber int, city *City) *networkedTravelWays {
-	travelWays := &networkedTravelWays{
-		city: city,
-	}
 
 	// start a TCP server to listen for requests on
-	listener, err := net.Listen("tcp", ":"+strconv.Itoa(portNumber))
+	listener, err := net.Listen("tcp", "localhost:"+strconv.Itoa(portNumber))
 	for isErrorAddressAlreadyInUse(err) {
 		portNumber++
-		listener, err = net.Listen("tcp", ":"+strconv.Itoa(portNumber))
+		listener, err = net.Listen("tcp", "localhost:"+strconv.Itoa(portNumber))
 	}
 	if err != nil && !isErrorAddressAlreadyInUse(err) {
 		fmt.Println(err)
 		return nil
+	}
+
+	travelWays := &networkedTravelWays{
+		city:   city,
+		server: listener,
 	}
 
 	// listen for incoming connection requests in the background
@@ -85,7 +70,7 @@ func setupNetworkedTravelWay(portNumber int, city *City) *networkedTravelWays {
 	return travelWays
 }
 
-func (travelWays *networkedTravelWays) requestConnection(address string) {
+func (travelWays *networkedTravelWays) requestConnection(address string, connectionType TravelWayProtocolType) {
 	fmt.Printf("Requesting connection: %s...\n", address)
 
 	connection, err := net.Dial("tcp", address)
@@ -94,21 +79,33 @@ func (travelWays *networkedTravelWays) requestConnection(address string) {
 		return
 	}
 
-	go travelWays.handleOutgoingConnection(connection)
+	go travelWays.handleOutgoingConnection(connection, connectionType)
 }
 
 // blocking, must be handled as a new routine
 func (travelWays *networkedTravelWays) handleIncomingConnection(connection net.Conn) {
 	defer connection.Close()
 
-	// receive the other city's name
-	remoteCityNameBytes := make([]byte, 1024)
-	n, err := connection.Read(remoteCityNameBytes)
+	// check if this is unidirectional or bidirectional and get the city's name
+	initializationPacketBytes := make([]byte, 1024)
+	n, err := connection.Read(initializationPacketBytes)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	remoteCityName := cityName(remoteCityNameBytes[:n])
+	initializationPacket := string(initializationPacketBytes[:n])
+	packetValues := strings.Split(initializationPacket, " ")
+	var remoteCityName cityName
+	if packetValues[0] == string(BIDIRECTIONAL) {
+		remoteListenerIP := packetValues[1]
+		travelWays.requestConnection(remoteListenerIP, UNIDIRECTIONAL)
+		remoteCityName = cityName(packetValues[2])
+	} else if packetValues[0] == string(UNIDIRECTIONAL) {
+		remoteCityName = cityName(packetValues[1])
+	} else {
+		fmt.Printf("error: travelWay protocol requires either \"bidirectional ip:port cityName\" or \"unidirectional cityName\", got %s\n", initializationPacket)
+		return
+	}
 
 	// send our city's name
 	_, err = connection.Write([]byte(travelWays.city.name))
@@ -117,12 +114,15 @@ func (travelWays *networkedTravelWays) handleIncomingConnection(connection net.C
 		return
 	}
 
+	// make sure we aren't already connected to the city
+	if _, alreadyExist := travelWays.city.inboundTravelWays[remoteCityName]; alreadyExist {
+		fmt.Printf("error: travelWay from %s to %s already exists\n", remoteCityName, travelWays.city.name)
+		return
+	}
+
 	// add travelWay to city
 	channel := make(chan *Merchant, 100)
-	travelWays.city.addEnteringTravelWay(&TravelWay{
-		city:    remoteCityName,
-		channel: channel,
-	})
+	travelWays.city.inboundTravelWays[remoteCityName] = channel
 
 	fmt.Printf("Successfully added city %s as a network connection, accepting merchants...\n", remoteCityName)
 
@@ -153,11 +153,24 @@ func (travelWays *networkedTravelWays) handleIncomingConnection(connection net.C
 }
 
 // blocking, must be handled as a new routine
-func (travelWays *networkedTravelWays) handleOutgoingConnection(connection net.Conn) {
+func (travelWays *networkedTravelWays) handleOutgoingConnection(connection net.Conn, connectionType TravelWayProtocolType) {
 	defer connection.Close()
 
-	// send our city's name
-	_, err := connection.Write([]byte(travelWays.city.name))
+	// send connection type
+	initializationPacket := ""
+	if connectionType == BIDIRECTIONAL {
+		initializationPacket = string(BIDIRECTIONAL) + " " + travelWays.server.Addr().String()
+	} else if connectionType == UNIDIRECTIONAL {
+		initializationPacket = string(UNIDIRECTIONAL)
+	} else {
+		fmt.Printf("error: travelWay protocol requires either \"bidirectional ip:port\" or \"unidirectional\", got %s\n", connectionType)
+		return
+	}
+
+	initializationPacket += " " + string(travelWays.city.name)
+
+	// send first packet
+	_, err := connection.Write([]byte(initializationPacket))
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -172,12 +185,15 @@ func (travelWays *networkedTravelWays) handleOutgoingConnection(connection net.C
 	}
 	remoteCityName := cityName(remoteCityNameBytes[:n])
 
+	// make sure we aren't already connected to the city
+	if _, alreadyExist := travelWays.city.outboundTravelWays[remoteCityName]; alreadyExist {
+		fmt.Printf("error: travelWay from %s to %s already exists\n", travelWays.city.name, remoteCityName)
+		return
+	}
+
 	// add travelWay to city
 	channel := make(chan *Merchant, 100)
-	travelWays.city.addLeavingTravelWay(&TravelWay{
-		city:    remoteCityName,
-		channel: channel,
-	})
+	travelWays.city.outboundTravelWays[remoteCityName] = channel
 
 	fmt.Printf("Successfully added city %s as a network connection, pushing merchants...\n", remoteCityName)
 
