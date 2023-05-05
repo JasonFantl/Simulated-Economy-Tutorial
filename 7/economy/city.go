@@ -21,8 +21,8 @@ type City struct {
 	locals    map[*Local]bool
 	merchants map[*Merchant]bool
 
-	inboundTravelWays  map[cityName]chan *Merchant
-	outboundTravelWays map[cityName]chan *Merchant
+	inboundTravelWays  travelWays
+	outboundTravelWays travelWays
 
 	networkPorts *networkedTravelWays
 }
@@ -35,8 +35,8 @@ func NewCity(name string, col color.Color, size int) *City {
 		locals:    make(map[*Local]bool),
 		merchants: make(map[*Merchant]bool),
 
-		inboundTravelWays:  make(map[cityName]chan *Merchant),
-		outboundTravelWays: make(map[cityName]chan *Merchant),
+		inboundTravelWays:  travelWays{},
+		outboundTravelWays: travelWays{},
 	}
 
 	for i := 0; i < size; i++ {
@@ -57,7 +57,7 @@ func (city *City) Update() {
 	// speed up the simulation
 	for i := 0; i < 100; i++ {
 		// check for new merchants
-		for _, channel := range city.inboundTravelWays {
+		city.inboundTravelWays.Range(func(_ cityName, channel chan *Merchant) bool {
 			if existNewMerchant, newMerchant := city.receiveImmigrant(channel); existNewMerchant {
 				city.merchants[newMerchant] = true
 				newMerchant.city = city.name // let the merchant know they arrived
@@ -71,7 +71,8 @@ func (city *City) Update() {
 					}
 				}
 			}
-		}
+			return true
+		})
 
 		// run all the agents
 		for local := range city.locals {

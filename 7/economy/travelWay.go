@@ -11,14 +11,62 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 )
+
+type travelWays struct {
+	channels map[cityName]chan *Merchant
+	mutex    sync.Mutex
+}
+
+func (travelWays *travelWays) Store(city cityName, channel chan *Merchant) {
+	travelWays.mutex.Lock()
+	defer travelWays.mutex.Unlock()
+	if travelWays.channels == nil {
+		travelWays.channels = make(map[cityName]chan *Merchant)
+	}
+
+	travelWays.channels[city] = channel
+}
+
+func (travelWays *travelWays) Load(city cityName) (chan *Merchant, bool) {
+	travelWays.mutex.Lock()
+	defer travelWays.mutex.Unlock()
+	if travelWays.channels == nil {
+		return nil, false
+	}
+	ch, ok := travelWays.channels[city]
+	return ch, ok
+}
+
+func (travelWays *travelWays) Delete(city cityName) {
+	travelWays.mutex.Lock()
+	defer travelWays.mutex.Unlock()
+	if travelWays.channels == nil {
+		return
+	}
+	delete(travelWays.channels, city)
+}
+
+func (travelWays *travelWays) Range(f func(cityName, chan *Merchant) bool) {
+	travelWays.mutex.Lock()
+	defer travelWays.mutex.Unlock()
+	if travelWays.channels == nil {
+		return
+	}
+	for k, v := range travelWays.channels {
+		if !f(k, v) {
+			break
+		}
+	}
+}
 
 // RegisterTravelWay connects cities using channels
 func RegisterTravelWay(fromCity *City, toCity *City) {
 	channel := make(chan *Merchant, 100)
-	toCity.inboundTravelWays[fromCity.name] = channel
-	fromCity.outboundTravelWays[toCity.name] = channel
+	toCity.inboundTravelWays.Store(fromCity.name, channel)
+	fromCity.outboundTravelWays.Store(toCity.name, channel)
 }
 
 type networkedTravelWays struct {
@@ -115,14 +163,14 @@ func (travelWays *networkedTravelWays) handleIncomingConnection(connection net.C
 	}
 
 	// make sure we aren't already connected to the city
-	if _, alreadyExist := travelWays.city.inboundTravelWays[remoteCityName]; alreadyExist {
+	if _, alreadyExist := travelWays.city.inboundTravelWays.Load(remoteCityName); alreadyExist {
 		fmt.Printf("error: travelWay from %s to %s already exists\n", remoteCityName, travelWays.city.name)
 		return
 	}
 
 	// add travelWay to city
 	channel := make(chan *Merchant, 100)
-	travelWays.city.inboundTravelWays[remoteCityName] = channel
+	travelWays.city.inboundTravelWays.Store(remoteCityName, channel)
 
 	fmt.Printf("Successfully added city %s as a network connection, accepting merchants...\n", remoteCityName)
 
@@ -149,7 +197,7 @@ func (travelWays *networkedTravelWays) handleIncomingConnection(connection net.C
 	}
 
 	fmt.Printf("Connection with %s broken, removing travelWay\n", remoteCityName)
-	delete(travelWays.city.inboundTravelWays, remoteCityName)
+	travelWays.city.inboundTravelWays.Delete(remoteCityName)
 }
 
 // blocking, must be handled as a new routine
@@ -186,14 +234,14 @@ func (travelWays *networkedTravelWays) handleOutgoingConnection(connection net.C
 	remoteCityName := cityName(remoteCityNameBytes[:n])
 
 	// make sure we aren't already connected to the city
-	if _, alreadyExist := travelWays.city.outboundTravelWays[remoteCityName]; alreadyExist {
+	if _, alreadyExist := travelWays.city.outboundTravelWays.Load(remoteCityName); alreadyExist {
 		fmt.Printf("error: travelWay from %s to %s already exists\n", travelWays.city.name, remoteCityName)
 		return
 	}
 
 	// add travelWay to city
 	channel := make(chan *Merchant, 100)
-	travelWays.city.outboundTravelWays[remoteCityName] = channel
+	travelWays.city.outboundTravelWays.Store(remoteCityName, channel)
 
 	fmt.Printf("Successfully added city %s as a network connection, pushing merchants...\n", remoteCityName)
 
@@ -223,7 +271,7 @@ func (travelWays *networkedTravelWays) handleOutgoingConnection(connection net.C
 	}
 
 	fmt.Printf("Connection with %s broken, removing travelWay\n", remoteCityName)
-	delete(travelWays.city.outboundTravelWays, remoteCityName)
+	travelWays.city.outboundTravelWays.Delete(remoteCityName)
 
 }
 

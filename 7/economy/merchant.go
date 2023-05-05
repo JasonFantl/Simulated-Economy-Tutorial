@@ -15,7 +15,7 @@ type Merchant struct {
 	Owned            int
 	ExpectedPrices   map[Good]map[cityName]float64 // merchants use this instead of the value in the market
 
-	bestSellLocation cityName //
+	bestSellLocation cityName // helpful to track
 }
 
 // NewMerchant creates a merchant
@@ -83,25 +83,26 @@ func (merchant *Merchant) update(city *City) {
 
 	// randomly move cities
 	if rand.Intn(100) == 0 {
-
-		for connectedCity := range city.outboundTravelWays {
-			merchant.leaveCity(city, connectedCity)
-			return
-		}
+		city.outboundTravelWays.Range(func(_ cityName, outboundTravelWay chan *Merchant) bool {
+			merchant.leaveCity(city, outboundTravelWay)
+			return false
+		})
+		return
 	}
 
 	// change cities once we bought our good in bulk
 	if merchant.Owned >= merchant.CarryingCapacity && merchant.city != merchant.bestSellLocation {
 		// make sure we have a path there, if not, randomly move (smarter merchants could potentially do path finding, Q learning?)
-		if _, ok := city.outboundTravelWays[merchant.bestSellLocation]; ok {
-			merchant.leaveCity(city, merchant.bestSellLocation)
+		if outboundTravelWay, ok := city.outboundTravelWays.Load(merchant.bestSellLocation); ok {
+			merchant.leaveCity(city, outboundTravelWay)
 			return
-		} else if len(city.outboundTravelWays) > 0 {
+		} else if len(city.outboundTravelWays.channels) > 0 {
 			// get random travelWay by using first in iteration
-			for randomCity := range city.outboundTravelWays {
-				merchant.leaveCity(city, randomCity)
-				return
-			}
+			city.outboundTravelWays.Range(func(_ cityName, randomOutboundTravelWay chan *Merchant) bool {
+				merchant.leaveCity(city, randomOutboundTravelWay)
+				return false
+			})
+			return
 		}
 	}
 
@@ -120,12 +121,12 @@ func (merchant *Merchant) update(city *City) {
 	}
 }
 
-func (merchant *Merchant) leaveCity(city *City, toCity cityName) {
+func (merchant *Merchant) leaveCity(city *City, outboundTravelWay chan *Merchant) {
 	// remove self from city
 	delete(city.merchants, merchant)
 	// enter travelWay
 	merchant.city = "traveling..." // not necessary, gets ignored by JSON serializer
-	city.outboundTravelWays[toCity] <- merchant
+	outboundTravelWay <- merchant
 }
 
 func (merchant *Merchant) isSelling(good Good) (bool, float64) {
@@ -159,16 +160,17 @@ func (merchant *Merchant) gossip(good Good) float64 {
 }
 
 // find the best location to travel to and how much you would make selling a good there minus the travel expense.
-// returns buy location, sell location, expected sell price
+// returns sell location, expected sell price
 func (merchant *Merchant) bestDeal(good Good, city *City) (cityName, float64) {
 
 	// considers nearby (connected) cities. Later, merchants can be more intelligent
 	bestSellLocation := merchant.city
 	bestProfit := 0.0
 	possibleCities := []cityName{merchant.city}
-	for name := range city.outboundTravelWays {
-		possibleCities = append(possibleCities, name)
-	}
+	city.outboundTravelWays.Range(func(cityName cityName, _ chan *Merchant) bool {
+		possibleCities = append(possibleCities, cityName)
+		return true
+	})
 	for _, buyLocation := range possibleCities {
 		buyPrice := merchant.ExpectedPrices[good][buyLocation]
 		for _, sellLocation := range possibleCities {
