@@ -7,11 +7,16 @@ server_address = "localhost"
 server_port = 55555
 
 def send_message(sock, message):
-    sock.sendall(message.encode())
+    sock.sendall(message)
 
 def receive_message(sock, buffer_size=1024):
-    data = sock.recv(buffer_size)
-    return data.decode()
+    try:
+        data = sock.recv(buffer_size)
+    except BlockingIOError:
+        print("No data available to read.")
+        return None
+
+    return data
 
 def main():
     # Create a TCP/IP socket
@@ -20,10 +25,10 @@ def main():
         sock.connect((server_address, server_port))
 
         # Send our city name
-        send_message(sock, "PythonCity")
+        send_message(sock, "PythonCity".encode())
 
         # Receive the remote city name
-        response = receive_message(sock)
+        response = receive_message(sock).decode()
         remote_city_name = response.strip()
         print(f"Connected to city {remote_city_name}")
         
@@ -70,8 +75,20 @@ def main():
                     }
                 }
             }
-            print(json.dumps(merchant_data))
-            send_message(sock, json.dumps(merchant_data) + "\n")
+            print(len(json.dumps(merchant_data).encode()))
+            message = json.dumps(merchant_data) + "\n"
+            send_message(sock, message.encode())
+
+        # send back any received merchants
+        sock.setblocking(False)
+        while True:
+            message = receive_message(sock)
+            if message:
+                send_message(sock, message)
+                print("sending back merchant")
+                time.sleep(0.1)
+            else:
+                break
 
         time.sleep(1)
         # Close the connection
