@@ -108,7 +108,7 @@ func (city *City) receiveImmigrant(channel chan *Merchant) (bool, *Merchant) {
 
 // CreateTravelWayToCity will make a bidirectional networked connection to another city over which merchants can travel
 func (city *City) CreateTravelWayToCity(address string) {
-	city.networkPorts.requestConnection(address, BIDIRECTIONAL)
+	city.networkPorts.requestConnection(address)
 }
 
 // Influence will make some change to the city, hopefully allowing you to run experiments on the economy
