@@ -36,7 +36,7 @@ def main():
         time.sleep(1.00)
 
         for i in range(10):
-            time.sleep(0.00)
+            time.sleep(0.01)
             print("Sending merchant...")
 
             merchant_data = {
@@ -50,28 +50,24 @@ def main():
                             "RIVERWOOD": 16.95381916897244,
                             "SEASIDE": 30.22688570620929,
                             "WINTERHOLD": 32.65932633911733,
-                            "PythonCity": 31.0
                     },
                     "chair": {
                             "PORTSVILLE": 11.045778022141988,
                             "RIVERWOOD": 20.342182353944178,
                             "SEASIDE": 10.709200882363625,
                             "WINTERHOLD": 11.756341277296725,
-                            "PythonCity": 12.0
                     },
                     "thread": {
                             "PORTSVILLE": 2.421718986326459,
                             "RIVERWOOD": 4.585140611165299,
                             "SEASIDE": 2.301383393344175,
                             "WINTERHOLD": 2.4909610238149353,
-                            "PythonCity": 3.0
                     },
                     "wood": {
                             "PORTSVILLE": 2.371161055748651,
                             "RIVERWOOD": 4.541456107859949,
                             "SEASIDE": 2.288907176392255,
                             "WINTERHOLD": 2.4714546798485775,
-                            "PythonCity": 3.0
                     }
                 }
             }
@@ -81,18 +77,18 @@ def main():
 
         # send back any received merchants
         sock.setblocking(False)
+        received_count = 0
         while True:
             message = receive_message(sock)
             if message:
-                send_message(sock, message)
-                print("sending back merchant")
-                time.sleep(0.1)
+                received_count += 1
             else:
                 break
 
-        time.sleep(1)
         # Close the connection
         sock.close()
+
+        print("Sent 10 merchants and received", received_count)
 
 if __name__ == "__main__":
     main()
